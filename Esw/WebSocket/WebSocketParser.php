@@ -41,7 +41,7 @@ class WebSocketParser implements ParserInterface
          * 如果更喜欢 event 方式 可以自定义 event 和具体的类的 map 即可
          * 注 目前 easyswoole 3.0.4 版本及以下 不支持直接传递 class string 可以通过这种方式
          */
-        $class = '\\App\\WebSocket\\' . ucfirst($data['class'] ?? 'Index');
+        $class = '\\Esw\\WebSocket\\' . ucfirst($data['class'] ?? 'Index');
         $caller->setControllerClass($class);
 
 // 提供一个事件风格的写法

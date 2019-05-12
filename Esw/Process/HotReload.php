@@ -6,7 +6,7 @@
  * Time: 23:18
  */
 
-namespace App\Process;
+namespace Esw\Process;
 
 use EasySwoole\Component\Process\AbstractProcess;
 use EasySwoole\EasySwoole\ServerManager;
@@ -35,7 +35,7 @@ class HotReload extends AbstractProcess
     public function run($arg)
     {
         // 此处指定需要监视的目录 建议只监视App目录下的文件变更
-        $this->monitorDir = !empty($arg['monitorDir']) ? $arg['monitorDir'] : EASYSWOOLE_ROOT . '/App';
+        $this->monitorDir = !empty($arg['monitorDir']) ? $arg['monitorDir'] : EASYSWOOLE_ROOT . '/Esw';
 
         // 指定需要监控的扩展名 不属于指定类型的的文件 无视变更 不重启
         $this->monitorExt = !empty($arg['monitorExt']) && is_array($arg['monitorExt']) ? $arg['monitorExt'] : ['php'];
@@ -130,7 +130,7 @@ class HotReload extends AbstractProcess
         global $inotifyResource;
 
         $lastReloadTime = 0;
-        $files = File::scanDirectory(EASYSWOOLE_ROOT . '/App');
+        $files = File::scanDirectory(EASYSWOOLE_ROOT . '/Esw');
         $files = array_merge($files['files'], $files['dirs']);
 
         $inotifyResource = inotify_init();
