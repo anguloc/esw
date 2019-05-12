@@ -1,0 +1,15 @@
+{
+    "require": {
+        "easyswoole/easyswoole": "3.x-dev",
+        "easyswoole/socket": "^1.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "Esw\\": "Esw/"
+        },
+        "files": [
+            "../common/files/Constants.php",
+            "../common/files/Helpers.php"
+        ]
+    }
+}

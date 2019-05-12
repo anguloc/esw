@@ -1,0 +1,8 @@
+composer.phar
+/vendor/
+.idea
+easyswoole
+easyswoole.install
+Log
+Temp
+.vscode
