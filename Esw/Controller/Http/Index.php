@@ -7,10 +7,10 @@ use EasySwoole\Http\AbstractInterface\Controller;
 
 class Index extends Controller
 {
-    function index()
+    public function index()
     {
-//        $this->actionNotFound('index');
-        $this->response()->write('ok');
+        $this->actionNotFound('index');
+        $this->response()->write('not exist http site');
         $this->response()->end();
     }
 

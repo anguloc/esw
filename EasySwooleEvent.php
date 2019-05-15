@@ -15,7 +15,7 @@ use EasySwoole\Http\Request;
 use EasySwoole\Http\Response;
 use EasySwoole\Component\Di;
 use EasySwoole\Socket\Dispatcher;
-use Esw\WebSocket\WebSocketParser;
+use Esw\Parser\WebSocketParser;
 use Esw\Process\HotReload;
 
 class EasySwooleEvent implements Event
@@ -26,7 +26,7 @@ class EasySwooleEvent implements Event
         // TODO: Implement initialize() method.
         date_default_timezone_set('Asia/Shanghai');
         // App目录切换
-        $namespace = 'Esw\\Http\\';
+        $namespace = 'Esw\Controller\Http\\';
         Di::getInstance()->set(SysConst::HTTP_CONTROLLER_NAMESPACE, $namespace);
     }
 
@@ -50,6 +50,7 @@ class EasySwooleEvent implements Event
         $register->set(EventRegister::onMessage, function (\swoole_websocket_server $server, \swoole_websocket_frame $frame) use ($dispatch) {
             $dispatch->dispatch($server, $frame->data, $frame);
         });
+
     }
 
     public static function onRequest(Request $request, Response $response): bool
