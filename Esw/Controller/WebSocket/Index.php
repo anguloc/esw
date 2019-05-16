@@ -1,6 +1,6 @@
 <?php
 
-namespace Esw\WebSocket;
+namespace Esw\Controller\WebSocket;
 
 use EasySwoole\EasySwoole\ServerManager;
 use EasySwoole\EasySwoole\Swoole\Task\TaskManager;
@@ -11,7 +11,14 @@ class Index extends Controller
 {
     public function index()
     {
-        $this->actionNotFound('index');
+        $data = $this->caller()->getArgs();
+        print_r($data);
+//        $this->actionNotFound('index');
+    }
+
+    public function start()
+    {
+
     }
 
 }

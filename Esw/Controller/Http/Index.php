@@ -1,6 +1,6 @@
 <?php
 
-namespace Esw\Http;
+namespace Esw\Controller\Http;
 
 use EasySwoole\Http\AbstractInterface\Controller;
 
@@ -9,7 +9,7 @@ class Index extends Controller
 {
     public function index()
     {
-        $this->actionNotFound('index');
+//        $this->actionNotFound('index');
         $this->response()->write('not exist http site');
         $this->response()->end();
     }
