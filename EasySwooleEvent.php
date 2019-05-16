@@ -46,6 +46,9 @@ class EasySwooleEvent implements Event
         $conf = new \EasySwoole\Socket\Config();
         $conf->setType(\EasySwoole\Socket\Config::WEB_SOCKET);
         $conf->setParser(new WebSocketParser());
+        $conf->setOnExceptionHandler(function($server,$throwable,$raw,$client,$response){
+
+        });
         $dispatch = new Dispatcher($conf);
         $register->set(EventRegister::onMessage, function (\swoole_websocket_server $server, \swoole_websocket_frame $frame) use ($dispatch) {
             $dispatch->dispatch($server, $frame->data, $frame);

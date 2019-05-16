@@ -6,7 +6,7 @@
  * Time: 22:55
  */
 
-namespace Esw\Service;
+namespace Esw\Tetris\Service;
 
 
 class Player

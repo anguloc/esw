@@ -7,7 +7,7 @@ use EasySwoole\EasySwoole\Swoole\Task\TaskManager;
 use EasySwoole\Socket\AbstractInterface\Controller;
 
 
-class Index extends Controller
+class Tetris extends Controller
 {
     public function index()
     {

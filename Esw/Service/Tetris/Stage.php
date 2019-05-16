@@ -6,7 +6,7 @@
  * Time: 22:52
  */
 
-namespace Esw\Service;
+namespace Esw\Tetris\Service;
 
 
 class Stage
