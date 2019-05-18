@@ -40,7 +40,7 @@ class HotReload extends AbstractProcess
         // 指定需要监控的扩展名 不属于指定类型的的文件 无视变更 不重启
         $this->monitorExt = !empty($arg['monitorExt']) && is_array($arg['monitorExt']) ? $arg['monitorExt'] : ['php'];
 
-        if (false && extension_loaded('inotify') && empty($arg['disableInotify'])) {
+        if (extension_loaded('inotify') && empty($arg['disableInotify'])) {
             // 扩展可用 优先使用扩展进行处理
             $this->registerInotifyEvent();
             echo "server hot reload start : use inotify\n";

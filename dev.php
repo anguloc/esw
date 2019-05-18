@@ -35,5 +35,9 @@ return [
     'DISPLAY_ERROR' => true,
     'PHAR' => [
         'EXCLUDE' => ['.idea', 'Log', 'Temp', 'easyswoole', 'easyswoole.install']
-    ]
+    ],
+    'HOT_RELOAD' => [
+        'HotReload',
+        ['disableInotify' => true],
+    ],
 ];
