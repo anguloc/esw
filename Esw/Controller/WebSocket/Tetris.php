@@ -16,4 +16,17 @@ class Tetris extends Controller
 //        $this->actionNotFound('index');
     }
 
+    public function start()
+    {
+        // 创建房间
+        // 确定人数
+        // 创建场地
+    }
+
+    public function ping()
+    {
+        $result = createReturn(SUCCESS_CODE, [],'', ['method' => __FUNCTION__]);
+        $this->response()->setMessage($result);
+    }
+
 }
