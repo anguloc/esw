@@ -11,5 +11,23 @@ namespace Esw\Tetris\Service;
 
 class Stage
 {
+    private $config = [];
+
+    private $abscissa = 8;
+    private $ordinate = 20;
+
+    private $matrix = [];
+
+    public function __construct()
+    {
+        $this->initMatrix();
+    }
+
+    private function initMatrix()
+    {
+        $this->matrix = [];
+    }
+
+
 
 }
