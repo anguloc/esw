@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "b60bba8bc2c4540a4c6b6c688d915b76",
+    "content-hash": "dbadda7537ce18a979fad64a7f1301f1",
     "packages": [
         {
             "name": "doctrine/instantiator",
@@ -362,6 +362,58 @@
                 "swoole"
             ],
             "time": "2019-03-25T13:26:32+00:00"
+        },
+        {
+            "name": "easyswoole/mysqli",
+            "version": "1.2.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/easy-swoole/mysqli.git",
+                "reference": "421077eac1fb509dbe7bc7b249eda125585e9186"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/easy-swoole/mysqli/zipball/421077eac1fb509dbe7bc7b249eda125585e9186",
+                "reference": "421077eac1fb509dbe7bc7b249eda125585e9186",
+                "shasum": "",
+                "mirrors": [
+                    {
+                        "url": "https://dl.laravel-china.org/%package%/%reference%.%type%",
+                        "preferred": true
+                    }
+                ]
+            },
+            "require": {
+                "easyswoole/spl": "^1.0"
+            },
+            "require-dev": {
+                "easyswoole/swoole-ide-helper": "^1.2"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "EasySwoole\\Mysqli\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "Apache-2.0"
+            ],
+            "authors": [
+                {
+                    "name": "YF",
+                    "email": "291323003@qq.com"
+                }
+            ],
+            "description": "An efficient swoole framework",
+            "homepage": "https://www.easyswoole.com/",
+            "keywords": [
+                "async",
+                "easyswoole",
+                "framework",
+                "swoole"
+            ],
+            "time": "2019-06-18T16:38:10+00:00"
         },
         {
             "name": "easyswoole/socket",
