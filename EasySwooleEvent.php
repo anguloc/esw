@@ -18,6 +18,9 @@ use EasySwoole\Component\Di;
 use EasySwoole\Socket\Client\Tcp;
 use EasySwoole\Socket\Client\Udp;
 use EasySwoole\Socket\Dispatcher;
+use EasySwoole\MysqliPool\Mysql as MysqlPool;
+use EasySwoole\MysqliPool\MysqlPoolException;
+use EasySwoole\Mysqli\Config as MysqlConfig;
 use Esw\Command\FirstSpider;
 use Esw\Exception\InvalidDataException\InvalidDataException;
 use Esw\Parser\WebSocketParser;
@@ -34,8 +37,10 @@ class EasySwooleEvent implements Event
         // App目录切换
         $namespace = 'Esw\Controller\Http\\';
         Di::getInstance()->set(SysConst::HTTP_CONTROLLER_NAMESPACE, $namespace);
+        // mysql 连接池
+        self::registerMysqlPool();
         // 自定义command
-        self::loadMyCommand();
+        self::registerMyCommand();
     }
 
     /**
@@ -46,8 +51,8 @@ class EasySwooleEvent implements Event
     {
         // TODO: Implement mainServerCreate() method.
 
-        self::runHotReload($register);
-        self::runWebSocket($register);
+        self::registerHotReload($register);
+        self::registerWebSocket($register);
     }
 
     public static function onRequest(Request $request, Response $response): bool
@@ -65,7 +70,7 @@ class EasySwooleEvent implements Event
      * 热重载
      * @param EventRegister $register
      */
-    private static function runHotReload(EventRegister $register): void
+    private static function registerHotReload(EventRegister $register): void
     {
         ServerManager::getInstance()
             ->getSwooleServer()
@@ -78,7 +83,7 @@ class EasySwooleEvent implements Event
      * @param EventRegister $register
      * @throws \EasySwoole\Socket\Exception\Exception
      */
-    private static function runWebSocket(EventRegister $register): void
+    private static function registerWebSocket(EventRegister $register): void
     {
         $conf = new \EasySwoole\Socket\Config();
         $conf->setType(\EasySwoole\Socket\Config::WEB_SOCKET);
@@ -115,8 +120,29 @@ class EasySwooleEvent implements Event
     /**
      * 加载一些自定义的command命令
      */
-    private static function loadMyCommand()
+    private static function registerMyCommand()
     {
         CommandContainer::getInstance()->set(new FirstSpider());
+    }
+
+    /**
+     *
+     */
+    private static function registerMysqlPool()
+    {
+        try {
+            $configData = Config::getInstance()->getConf('MYSQL');
+            $config = new MysqlConfig($configData);
+            $poolConf = MysqlPool::getInstance()->register('mysql', $config);
+        } catch (MysqlPoolException $e) {
+            $error = '';
+            $error .= '错误类型：' . get_class($e) . PHP_EOL;
+            $error .= '错误代码：' . $e->getCode() . PHP_EOL;
+            $error .= '错误信息：' . $e->getMessage() . PHP_EOL;
+            $error .= '错误堆栈：' . $e->getTraceAsString() . PHP_EOL;
+            if (Core::getInstance()->isDev()) {
+                stdout($error);
+            }
+        }
     }
 }
