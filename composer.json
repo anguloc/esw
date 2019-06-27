@@ -5,7 +5,8 @@
         "easyswoole/mysqli": "^1.2",
         "easyswoole/actor": "^2.0",
         "easyswoole/redis-pool": "^1.0",
-        "easyswoole/mysqli-pool": "^1.0"
+        "easyswoole/mysqli-pool": "^1.0",
+        "swlib/saber": "^1.0"
     },
     "autoload": {
         "psr-4": {

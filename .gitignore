@@ -6,3 +6,5 @@ easyswoole.install
 Log
 Temp
 .vscode
+dev.php
+produce.php

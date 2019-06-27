@@ -9,6 +9,7 @@
 namespace EasySwoole\EasySwoole;
 
 
+use EasySwoole\EasySwoole\Command\CommandContainer;
 use EasySwoole\EasySwoole\Swoole\EventRegister;
 use EasySwoole\EasySwoole\AbstractInterface\Event;
 use EasySwoole\Http\Request;
@@ -17,6 +18,7 @@ use EasySwoole\Component\Di;
 use EasySwoole\Socket\Client\Tcp;
 use EasySwoole\Socket\Client\Udp;
 use EasySwoole\Socket\Dispatcher;
+use Esw\Command\FirstSpider;
 use Esw\Exception\InvalidDataException\InvalidDataException;
 use Esw\Parser\WebSocketParser;
 use Esw\Process\HotReload;
@@ -32,6 +34,8 @@ class EasySwooleEvent implements Event
         // App目录切换
         $namespace = 'Esw\Controller\Http\\';
         Di::getInstance()->set(SysConst::HTTP_CONTROLLER_NAMESPACE, $namespace);
+        // 自定义command
+        self::loadMyCommand();
     }
 
     /**
@@ -106,5 +110,13 @@ class EasySwooleEvent implements Event
         $register->set(EventRegister::onMessage, function (\swoole_websocket_server $server, \swoole_websocket_frame $frame) use ($dispatch) {
             $dispatch->dispatch($server, $frame->data, $frame);
         });
+    }
+
+    /**
+     * 加载一些自定义的command命令
+     */
+    private static function loadMyCommand()
+    {
+        CommandContainer::getInstance()->set(new FirstSpider());
     }
 }
