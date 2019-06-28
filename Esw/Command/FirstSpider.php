@@ -13,6 +13,8 @@ use EasySwoole\MysqliPool\Mysql as MysqlPool;
 use Swoole\Coroutine\Channel;
 use Swlib\SaberGM;
 use Swlib\Http\Exception\RequestException;
+use EasySwoole\EasySwoole\Config;
+use EasySwoole\EasySwoole\Logger;
 
 /**
  * easyswoole + saber 的第一只小蜘蛛
@@ -39,7 +41,13 @@ class FirstSpider implements CommandInterface
 
     public function exec(array $args): ?string
     {
-
+        Logger::getInstance()->error(111);
+        Logger::getInstance()->waring(111);
+        Logger::getInstance()->console(111);
+        Logger::getInstance()->info(111);
+        Logger::getInstance()->notice(111);
+        return Config::getInstance()->getConf('TEMP_DIR');
+        $this->start();
         // 注册分析
         go([$this, 'registerParseData']);
         // 注册入库
@@ -57,7 +65,7 @@ class FirstSpider implements CommandInterface
 
     private function main()
     {
-        $this->start();
+
 //        $a = MysqlPool::defer('mysql')->rawQuery('show tables');
 //        stdout($a);
 //
@@ -136,6 +144,8 @@ class FirstSpider implements CommandInterface
                 continue;
             }
 
+            continue;
+
             $data = [];
             foreach ($responses as $respons) {
                 $url = $respons->getUri()->__toString();
@@ -171,6 +181,9 @@ class FirstSpider implements CommandInterface
         // 初始化 channel
         $this->dataChan = new Channel(5);
         $this->rawChan  = new Channel(5);
+
+        // 加个定时器 看下chan使用情况
+
     }
 
     private function end()
