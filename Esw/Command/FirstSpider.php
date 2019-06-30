@@ -41,12 +41,6 @@ class FirstSpider implements CommandInterface
 
     public function exec(array $args): ?string
     {
-        Logger::getInstance()->error(111);
-        Logger::getInstance()->waring(111);
-        Logger::getInstance()->console(111);
-        Logger::getInstance()->info(111);
-        Logger::getInstance()->notice(111);
-        return Config::getInstance()->getConf('TEMP_DIR');
         $this->start();
         // 注册分析
         go([$this, 'registerParseData']);
