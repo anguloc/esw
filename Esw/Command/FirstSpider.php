@@ -29,9 +29,14 @@ class FirstSpider implements CommandInterface
     private $dataChan; // 入库数据
     /** @var Channel */
     private $rawChan; // 原始数据 需要解析
+    /** @var Channel */
+    private $jobsChan; // 任务分发
+
     private $start_time;
     private $end_time;
     private $end = false;
+
+    private $chanLogTick;
 
 
     public function commandName(): string
@@ -42,7 +47,9 @@ class FirstSpider implements CommandInterface
     public function exec(array $args): ?string
     {
         $this->start();
-        // 注册分析
+        // 注册任务分发
+        go([$this, 'registerJobsDispatch']);
+        // 注册数据解析
         go([$this, 'registerParseData']);
         // 注册入库
         go([$this, 'registerInsertOrUpdate']);
@@ -54,7 +61,7 @@ class FirstSpider implements CommandInterface
 
     public function help(array $args): ?string
     {
-        return 'easyswoole + saber 的第一只小蜘蛛，搞一些普（se）通（qi）的数据';
+        return 'easyswoole + saber 的第一只小蜘蛛，采用单进程多协程，搞一些普（se）通（qi）的数据';
     }
 
     private function main()
@@ -70,17 +77,65 @@ class FirstSpider implements CommandInterface
 
 
         for ($i=700515;$i<=775497;$i+=10) {
-
-//            $this->runSpidersHtml($i);
+//            go(function()use($i){
+                $urls = [];
+                foreach (range($i, $i+9) as $item) {
+                    $urls[] = [
+                        'uri' => $this->baseUrl . $page = "/ckj1/{$item}.html",
+                    ];
+                }
+                $this->jobsChan->push($urls);
+//            });
+//            $this->runRequest($i);
         }
+
+        $this->end();
+    }
+
+    /**
+     * 注册任务分发
+     */
+    private function registerJobsDispatch()
+    {
+        while (true) {
+            if ($this->isEnd()) {
+                break;
+            }
+
+            $data = $this->jobsChan->pop();
+            if (!$data) {
+                continue;
+            }
+            \Swoole\Coroutine::sleep(1);
+
+            // 执行请求
+            $this->rawChan->push($data);
+        }
+    }
+
+    /**
+     * 执行请求
+     * @param $i
+     */
+    private function runRequest($i)
+    {
+
+        while (true) {
+            if ($this->isEnd()) {
+                break;
+            }
+
+            $data = $this->dataChan->pop();
+            if (!$data) {
+                continue;
+            }
+
+            \Swoole\Coroutine::sleep(3);
+        }
+
+
         return;
 
-        $urls = [];
-        foreach (range($i, $i+9) as $item) {
-            $urls[] = [
-                'uri' => $this->baseUrl . $page = "/ckj1/{$item}.html",
-            ];
-        }
 
         try {
             $responses = SaberGM::requests($urls, ['timeout' => 5, 'retry_time' => 3]);
@@ -96,8 +151,6 @@ class FirstSpider implements CommandInterface
         $result =  "multi-requests [ {$responses->success_num} ok, {$responses->error_num} error ]:" ."consuming-time: {$responses->time}s";
         stdout($result);
 
-
-        $this->end();
 
 
 
@@ -119,6 +172,7 @@ class FirstSpider implements CommandInterface
             }
 
             // TODO: 处理数据
+            \Swoole\Coroutine::sleep(5);
 
         }
     }
@@ -137,6 +191,9 @@ class FirstSpider implements CommandInterface
             if (!$data) {
                 continue;
             }
+            \Swoole\Coroutine::sleep(3);
+
+            $this->dataChan->push($data);
 
             continue;
 
@@ -175,17 +232,25 @@ class FirstSpider implements CommandInterface
         // 初始化 channel
         $this->dataChan = new Channel(5);
         $this->rawChan  = new Channel(5);
+        $this->jobsChan  = new Channel(20);
 
         // 加个定时器 看下chan使用情况
+        $this->chanLogTick = \Swoole\Timer::tick(5000, function(){
+            Logger::getInstance()->notice(json_encode($this->dataChan->stats()));
+            Logger::getInstance()->notice(json_encode($this->rawChan->stats()));
+            Logger::getInstance()->notice(json_encode($this->jobsChan->stats()));
+        });
 
     }
 
     private function end()
     {
+        // todo: 清空各项任务
         $this->end = true;
 
         $this->dataChan->close();
         $this->rawChan->close();
+        $this->jobsChan->close();
 
         $this->end_time = microtime(true);
         stdout('用时'.$this->end_time - $this->start_time);
