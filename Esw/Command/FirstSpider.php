@@ -236,9 +236,11 @@ class FirstSpider implements CommandInterface
 
         // 加个定时器 看下chan使用情况
         $this->chanLogTick = \Swoole\Timer::tick(5000, function(){
-            Logger::getInstance()->notice(json_encode($this->dataChan->stats()));
-            Logger::getInstance()->notice(json_encode($this->rawChan->stats()));
-            Logger::getInstance()->notice(json_encode($this->jobsChan->stats()));
+            Logger::getInstance()->notice(print_r([
+                'dataChan' => $this->dataChan->stats(),
+                'rawChan' => $this->rawChan->stats(),
+                'jobsChan' => $this->jobsChan->stats(),
+            ], true));
         });
 
     }
