@@ -10,6 +10,8 @@ namespace Esw\Command;
 
 use EasySwoole\EasySwoole\Command\CommandInterface;
 use EasySwoole\MysqliPool\Mysql as MysqlPool;
+use Swlib\Http\Exception\ConnectException;
+use Swlib\Http\Exception\HttpExceptionMask;
 use Swoole\Coroutine\Channel;
 use Swlib\SaberGM;
 use Swlib\Http\Exception\RequestException;
@@ -48,11 +50,11 @@ class FirstSpider implements CommandInterface
     {
         $this->start();
         // 注册任务分发
-        go([$this, 'registerJobsDispatch']);
-        // 注册数据解析
-        go([$this, 'registerParseData']);
-        // 注册入库
-        go([$this, 'registerInsertOrUpdate']);
+//        go([$this, 'registerJobsDispatch']);
+//        // 注册数据解析
+//        go([$this, 'registerParseData']);
+//        // 注册入库
+//        go([$this, 'registerInsertOrUpdate']);
         // 启动
         go([$this, 'main']);
 
@@ -76,17 +78,19 @@ class FirstSpider implements CommandInterface
 //        });
 
 
+
+
         for ($i=700515;$i<=775497;$i+=10) {
 //            go(function()use($i){
-                $urls = [];
-                foreach (range($i, $i+9) as $item) {
-                    $urls[] = [
-                        'uri' => $this->baseUrl . $page = "/ckj1/{$item}.html",
-                    ];
-                }
-                $this->jobsChan->push($urls);
-//            });
-//            $this->runRequest($i);
+//                $urls = [];
+//                foreach (range($i, $i+9) as $item) {
+//                    $urls[] = [
+//                        'uri' => $this->baseUrl . $page = "/ckj1/{$item}.html",
+//                    ];
+//                }
+//                $this->jobsChan->push($urls);
+////            });
+            $this->runRequest($i);
         }
 
         $this->end();
@@ -120,37 +124,43 @@ class FirstSpider implements CommandInterface
     private function runRequest($i)
     {
 
-        while (true) {
-            if ($this->isEnd()) {
-                break;
-            }
-
-            $data = $this->dataChan->pop();
-            if (!$data) {
-                continue;
-            }
-
-            \Swoole\Coroutine::sleep(3);
+        foreach (range($i, $i+9) as $item) {
+            $urls[] = [
+                'uri' => $this->baseUrl . $page = "/ckj1/{$item}.html",
+            ];
         }
 
+//        $this->end();
 
-        return;
+
 
 
         try {
             $responses = SaberGM::requests($urls, ['timeout' => 5, 'retry_time' => 3]);
+        }catch(ConnectException $e){
+            stdout($i);
+            stdout('connect ' . $page);
+            die;
         }catch(RequestException $e){
+//            print_r($e);
+            stdout($i);
             stdout('timeout ' . $page);
-//            die;
+            die;
             return;
         }catch(\Exception $e){
+            stdout($i);
             stdout('new error' . json_encode($e, JSON_UNESCAPED_UNICODE));
-//            die;
+            die;
             return;
+        }
+        if($responses->error_num > 0 ){
+
+//            die;
         }
         $result =  "multi-requests [ {$responses->success_num} ok, {$responses->error_num} error ]:" ."consuming-time: {$responses->time}s";
         stdout($result);
 
+//        $this->end();
 
 
 
@@ -226,6 +236,22 @@ class FirstSpider implements CommandInterface
 
     private function start()
     {
+        // 忽略 saber 所有异常
+//        SaberGM::exceptionReport(
+//            HttpExceptionMask::E_NONE
+//        );
+
+
+
+        SaberGM::exceptionHandle(function (\Exception $e) {
+            if(is_callable([$e, 'getRequest'])){
+                stdout($e->getRequest()->getUri()->getPath());
+            }
+            echo get_class($e) . " is caught!\n";
+            return true;
+        });
+
+
         $this->start_time = microtime(true);
         // 设置结束状态为  没有结束
         $this->end = false;
@@ -235,13 +261,13 @@ class FirstSpider implements CommandInterface
         $this->jobsChan  = new Channel(20);
 
         // 加个定时器 看下chan使用情况
-        $this->chanLogTick = \Swoole\Timer::tick(5000, function(){
-            Logger::getInstance()->notice(print_r([
-                'dataChan' => $this->dataChan->stats(),
-                'rawChan' => $this->rawChan->stats(),
-                'jobsChan' => $this->jobsChan->stats(),
-            ], true));
-        });
+//        $this->chanLogTick = \Swoole\Timer::tick(5000, function(){
+//            Logger::getInstance()->notice(print_r([
+//                'dataChan' => $this->dataChan->stats(),
+//                'rawChan' => $this->rawChan->stats(),
+//                'jobsChan' => $this->jobsChan->stats(),
+//            ], true));
+//        });
 
     }
 
@@ -255,7 +281,7 @@ class FirstSpider implements CommandInterface
         $this->jobsChan->close();
 
         $this->end_time = microtime(true);
-        stdout('用时'.$this->end_time - $this->start_time);
+        stdout('用时'.($this->end_time - $this->start_time));
 
     }
 }
