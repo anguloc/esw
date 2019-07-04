@@ -10,6 +10,7 @@ namespace Esw\Command;
 
 use EasySwoole\EasySwoole\Command\CommandInterface;
 use EasySwoole\MysqliPool\Mysql as MysqlPool;
+use Swlib\Http\Exception\ClientException;
 use Swlib\Http\Exception\ConnectException;
 use Swlib\Http\Exception\HttpExceptionMask;
 use Swoole\Coroutine\Channel;
@@ -244,10 +245,23 @@ class FirstSpider implements CommandInterface
 
 
         SaberGM::exceptionHandle(function (\Exception $e) {
-            if(is_callable([$e, 'getRequest'])){
-                stdout($e->getRequest()->getUri()->getPath());
+            // 异常入库
+//            if(is_callable([$e, 'getRequest'])){
+//                stdout($e->getRequest()->getUri()->getPath());
+//            }
+            if($e instanceof RequestException){
+                $excep_data = [
+                    'title' => '',
+                    'url' => '',
+                    'key' => '',
+                    'form_data' => '',
+                    'add_time' => time(),
+                ];
+                /** @see registerInsertOrUpdate*/
+                $this->dataChan->push($excep_data);
+//                stdout(catch_exception($e, $e->getRequest()->getUri()->getPath().'--'));
             }
-            echo get_class($e) . " is caught!\n";
+//            echo get_class($e) . " is caught!\n";
             return true;
         });
 
