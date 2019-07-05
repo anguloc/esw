@@ -253,8 +253,8 @@ class FirstSpider implements CommandInterface
                 $excep_data = [
                     'title' => '',
                     'url' => '',
-                    'key' => '',
-                    'form_data' => '',
+                    'key' => $e->getRequest()->getUri()->getPath(),
+                    'form_data' => json_encode(catch_exception($e), JSON_UNESCAPED_UNICODE),
                     'add_time' => time(),
                 ];
                 /** @see registerInsertOrUpdate*/
