@@ -21,10 +21,10 @@ use EasySwoole\Socket\Dispatcher;
 use EasySwoole\MysqliPool\Mysql as MysqlPool;
 use EasySwoole\MysqliPool\MysqlPoolException;
 use EasySwoole\Mysqli\Config as MysqlConfig;
-use Esw\Command\FirstSpider;
 use Esw\Exception\InvalidDataException\InvalidDataException;
 use Esw\Parser\WebSocketParser;
 use Esw\Process\HotReload;
+use Esw\Util\Logger as MyLogger;
 
 
 class EasySwooleEvent implements Event
@@ -34,9 +34,9 @@ class EasySwooleEvent implements Event
     {
         // TODO: Implement initialize() method.
         date_default_timezone_set('Asia/Shanghai');
-        // App目录切换
-        $namespace = 'Esw\Controller\Http\\';
-        Di::getInstance()->set(SysConst::HTTP_CONTROLLER_NAMESPACE, $namespace);
+
+        // 官方工具切换
+        self::changeEasySwoole();
         // mysql 连接池
         self::registerMysqlPool();
         // 自定义command
@@ -64,6 +64,19 @@ class EasySwooleEvent implements Event
     public static function afterRequest(Request $request, Response $response): void
     {
         // TODO: Implement afterAction() method.
+    }
+
+    /**
+     * 官方有些东西用不习惯  切换下
+     */
+    private static function changeEasySwoole()
+    {
+        // App目录切换  app已有其他项目占用
+        $namespace = 'Esw\Controller\Http\\';
+        Di::getInstance()->set(SysConst::HTTP_CONTROLLER_NAMESPACE, $namespace);
+        // 官方那个背景颜色log真的亮瞎眼  去掉背景颜色
+        $logger = new MyLogger();
+        Di::getInstance()->set(SysConst::LOGGER_HANDLER, $logger);
     }
 
     /**
@@ -122,11 +135,20 @@ class EasySwooleEvent implements Event
      */
     private static function registerMyCommand()
     {
-        CommandContainer::getInstance()->set(new FirstSpider());
+        /** @see \Esw\Command\*/
+        $command_dir = 'Esw/Command/';
+        foreach (glob(EASYSWOOLE_ROOT . "/{$command_dir}*Command.php") as $item) {
+            $file_name = pathinfo($item, PATHINFO_FILENAME);
+            if(empty($file_name)){
+                continue;
+            }
+            $command = str_replace('/','\\', $command_dir . $file_name);
+            CommandContainer::getInstance()->set(new $command);
+        }
     }
 
     /**
-     *
+     * 注册mysql 连接池
      */
     private static function registerMysqlPool()
     {

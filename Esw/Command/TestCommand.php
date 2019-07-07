@@ -21,12 +21,11 @@ use EasySwoole\EasySwoole\Config;
 use EasySwoole\EasySwoole\Logger;
 
 /**
- * easyswoole + saber 的第一只小蜘蛛
- * 搞一些普（se）通（qing）的数据
- * Class FirstSpider
+ * 测试一些玩法
+ * Class TestCommand
  * @package Esw\Command
  */
-class FirstSpider implements CommandInterface
+class TestCommand implements CommandInterface
 {
     private $baseUrl = 'http://www.ckjdh.pw';
     /** @var Channel */
@@ -45,11 +44,12 @@ class FirstSpider implements CommandInterface
 
     public function commandName(): string
     {
-        return 'spider_1';
+        return 'test';
     }
 
     public function exec(array $args): ?string
     {
+        return 'test';
         $this->start();
 //        // 注册数据解析
         go([$this, 'registerParseData']);
@@ -63,7 +63,7 @@ class FirstSpider implements CommandInterface
 
     public function help(array $args): ?string
     {
-        return 'easyswoole + saber 的第一只小蜘蛛，采用单进程多协程，搞一些普（se）通（qi）的数据';
+        return '测试一些玩法';
     }
 
     private function main()
@@ -136,6 +136,8 @@ class FirstSpider implements CommandInterface
                 continue;
             }
 
+            Logger::getInstance()->log(print_r($data, true));
+            continue;
             // 如果是多维数组 则当批量插入
             $db = MysqlPool::defer(MYSQL_POOL);
             try {
