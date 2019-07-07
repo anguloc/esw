@@ -131,9 +131,10 @@ class EasySwooleEvent implements Event
     private static function registerMysqlPool()
     {
         try {
-            $configData = Config::getInstance()->getConf('MYSQL');
+            // mysql
+            $configData = Config::getInstance()->getConf(MYSQL_POOL);
             $config = new MysqlConfig($configData);
-            $poolConf = MysqlPool::getInstance()->register('mysql', $config);
+            $poolConf = MysqlPool::getInstance()->register(MYSQL_POOL, $config);
         } catch (MysqlPoolException $e) {
             $error = '';
             $error .= '错误类型：' . get_class($e) . PHP_EOL;

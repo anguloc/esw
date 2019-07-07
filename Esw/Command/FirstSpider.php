@@ -13,6 +13,7 @@ use EasySwoole\MysqliPool\Mysql as MysqlPool;
 use Swlib\Http\Exception\ClientException;
 use Swlib\Http\Exception\ConnectException;
 use Swlib\Http\Exception\HttpExceptionMask;
+use Swlib\Saber\Response;
 use Swoole\Coroutine\Channel;
 use Swlib\SaberGM;
 use Swlib\Http\Exception\RequestException;
@@ -32,14 +33,14 @@ class FirstSpider implements CommandInterface
     private $dataChan; // 入库数据
     /** @var Channel */
     private $rawChan; // 原始数据 需要解析
-    /** @var Channel */
-    private $jobsChan; // 任务分发
 
     private $start_time;
     private $end_time;
     private $end = false;
 
     private $chanLogTick;
+
+    const TABLE = 'spiders_copy2';
 
 
     public function commandName(): string
@@ -50,12 +51,10 @@ class FirstSpider implements CommandInterface
     public function exec(array $args): ?string
     {
         $this->start();
-        // 注册任务分发
-//        go([$this, 'registerJobsDispatch']);
 //        // 注册数据解析
-//        go([$this, 'registerParseData']);
+        go([$this, 'registerParseData']);
 //        // 注册入库
-//        go([$this, 'registerInsertOrUpdate']);
+        go([$this, 'registerInsertOrUpdate']);
         // 启动
         go([$this, 'main']);
 
@@ -69,28 +68,8 @@ class FirstSpider implements CommandInterface
 
     private function main()
     {
-
-//        $a = MysqlPool::defer('mysql')->rawQuery('show tables');
-//        stdout($a);
-//
-//        MysqlPool::invoker('mysql', function ($db) {
-//            $a = $db->rawQuery('show tables');
-//            stdout($a);
-//        });
-
-
-
-
         for ($i=700515;$i<=775497;$i+=10) {
-//            go(function()use($i){
-//                $urls = [];
-//                foreach (range($i, $i+9) as $item) {
-//                    $urls[] = [
-//                        'uri' => $this->baseUrl . $page = "/ckj1/{$item}.html",
-//                    ];
-//                }
-//                $this->jobsChan->push($urls);
-////            });
+            // 这里如果用多协程的话  saber 并发请求里会一起返回  所以不能这样做
             $this->runRequest($i);
         }
 
@@ -100,71 +79,46 @@ class FirstSpider implements CommandInterface
     /**
      * 注册任务分发
      */
-    private function registerJobsDispatch()
-    {
-        while (true) {
-            if ($this->isEnd()) {
-                break;
-            }
-
-            $data = $this->jobsChan->pop();
-            if (!$data) {
-                continue;
-            }
-            \Swoole\Coroutine::sleep(1);
-
-            // 执行请求
-            $this->rawChan->push($data);
-        }
-    }
-
-    /**
-     * 执行请求
-     * @param $i
-     */
     private function runRequest($i)
     {
-
         foreach (range($i, $i+9) as $item) {
             $urls[] = [
                 'uri' => $this->baseUrl . $page = "/ckj1/{$item}.html",
             ];
         }
 
-//        $this->end();
-
-
-
 
         try {
             $responses = SaberGM::requests($urls, ['timeout' => 5, 'retry_time' => 3]);
         }catch(ConnectException $e){
-            stdout($i);
-            stdout('connect ' . $page);
-            die;
+//            stdout($i);
+//            stdout('connect ' . $page);
+//            die;
         }catch(RequestException $e){
 //            print_r($e);
-            stdout($i);
-            stdout('timeout ' . $page);
-            die;
-            return;
+//            stdout($i);
+//            stdout('timeout ' . $page);
+//            die;
+//            return;
         }catch(\Exception $e){
-            stdout($i);
-            stdout('new error' . json_encode($e, JSON_UNESCAPED_UNICODE));
-            die;
-            return;
+//            stdout($i);
+//            stdout('new error' . json_encode($e, JSON_UNESCAPED_UNICODE));
+//            die;
+//            return;
         }
-        if($responses->error_num > 0 ){
+//        if($responses->error_num > 0 ){
 
 //            die;
-        }
+//        }
         $result =  "multi-requests [ {$responses->success_num} ok, {$responses->error_num} error ]:" ."consuming-time: {$responses->time}s";
         stdout($result);
 
-//        $this->end();
+        stdout(count($responses));
 
-
-
+        foreach ($responses as $response) {
+            /** @see registerParseData()*/
+            $this->rawChan->push($response);
+        }
     }
 
     /**
@@ -178,12 +132,21 @@ class FirstSpider implements CommandInterface
             }
 
             $data = $this->dataChan->pop();
-            if (!$data) {
+            if (empty($data) || !is_array($data)) {
                 continue;
             }
 
-            // TODO: 处理数据
-            \Swoole\Coroutine::sleep(5);
+            // 如果是多维数组 则当批量插入
+            $db = MysqlPool::defer(MYSQL_POOL);
+            try {
+                if (count($data) == count($data, 1)) {
+                    $db->insert(self::TABLE, $data);
+                } else {
+                    $db->insertMulti(self::TABLE, $data);
+                }
+            }catch(\Throwable $e){
+                Logger::getInstance()->error(catch_exception($e), 'MYSQL');
+            }
 
         }
     }
@@ -198,35 +161,29 @@ class FirstSpider implements CommandInterface
                 break;
             }
 
-            $data = $this->rawChan->pop();
-            if (!$data) {
+            /**
+             * @see runRequest()
+             * @var $data Response
+             */
+            $response = $this->rawChan->pop();
+            if (!$response) {
                 continue;
             }
-            \Swoole\Coroutine::sleep(3);
 
-            $this->dataChan->push($data);
-
-            continue;
-
-            $data = [];
-            foreach ($responses as $respons) {
-                $url = $respons->getUri()->__toString();
-                $body = $respons->getBody()->__toString();
-                preg_match('/<span class="cat_pos_l">您的位置：<a href="\/">首页<\/a>&nbsp;&nbsp;&raquo;&nbsp;&nbsp;<a href=\'(.*)\' >(.*)<\/a>&nbsp;&nbsp;&raquo;&nbsp;&nbsp;(.*)<\/span>/', $body, $match);
-                $data[] = [
-                    'title' => $match[3] ?: '',
-                    'url' => $url,
-                    'key' => $match[2] ?: '',
-                    'add_time' => time(),
-                ];
-            }
+            $url = $response->getUri()->__toString();
+            $body = $response->getBody()->__toString();
+            preg_match('/<span class="cat_pos_l">您的位置：<a href="\/">首页<\/a>&nbsp;&nbsp;&raquo;&nbsp;&nbsp;<a href=\'(.*)\' >(.*)<\/a>&nbsp;&nbsp;&raquo;&nbsp;&nbsp;(.*)<\/span>/', $body, $match);
+            $data = [
+                'title' => $match[3] ?: '',
+                'url' => $url,
+                'key' => $match[2] ?: '',
+                'add_time' => time(),
+            ];
 
             if($data){
-                $this->chan->push($data);
+                /** @see registerInsertOrUpdate()*/
+                $this->dataChan->push($data);
             }
-
-            // TODO: 处理数据
-
         }
     }
 
@@ -272,14 +229,12 @@ class FirstSpider implements CommandInterface
         // 初始化 channel
         $this->dataChan = new Channel(5);
         $this->rawChan  = new Channel(5);
-        $this->jobsChan  = new Channel(20);
 
         // 加个定时器 看下chan使用情况
 //        $this->chanLogTick = \Swoole\Timer::tick(5000, function(){
 //            Logger::getInstance()->notice(print_r([
 //                'dataChan' => $this->dataChan->stats(),
 //                'rawChan' => $this->rawChan->stats(),
-//                'jobsChan' => $this->jobsChan->stats(),
 //            ], true));
 //        });
 
@@ -290,9 +245,10 @@ class FirstSpider implements CommandInterface
         // todo: 清空各项任务
         $this->end = true;
 
+        \Swoole\Coroutine::sleep(20);
+
         $this->dataChan->close();
         $this->rawChan->close();
-        $this->jobsChan->close();
 
         $this->end_time = microtime(true);
         stdout('用时'.($this->end_time - $this->start_time));
