@@ -49,6 +49,7 @@ class TestCommand implements CommandInterface
 
     public function exec(array $args): ?string
     {
+        Logger::getInstance()->error(123);
         return 'test';
         $this->start();
 //        // 注册数据解析

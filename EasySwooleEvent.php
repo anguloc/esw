@@ -75,7 +75,9 @@ class EasySwooleEvent implements Event
         $namespace = 'Esw\Controller\Http\\';
         Di::getInstance()->set(SysConst::HTTP_CONTROLLER_NAMESPACE, $namespace);
         // 官方那个背景颜色log真的亮瞎眼  去掉背景颜色
-        $logger = new MyLogger();
+        $logDir = EASYSWOOLE_ROOT . '/Log';
+        defined('EASYSWOOLE_LOG_DIR') || define('EASYSWOOLE_LOG_DIR', $logDir);
+        $logger = new MyLogger($logDir);
         Di::getInstance()->set(SysConst::LOGGER_HANDLER, $logger);
     }
 
