@@ -33,6 +33,8 @@ class FirstSpiderCommand implements CommandInterface
     private $dataChan; // 入库数据
     /** @var Channel */
     private $rawChan; // 原始数据 需要解析
+    /** @var Channel */
+    private $jobChan; // 原始数据 需要解析
 
     private $start_time;
     private $end_time;
@@ -56,12 +58,14 @@ class FirstSpiderCommand implements CommandInterface
         // TODO: 结束问题。1、需要等chan为空再close；2、实际未退出
         // TODO:
         $this->start();
-//        // 注册数据解析
+        // 注册任务分发
+        go([$this, 'dispatchJobs']);
+        // 注册数据解析
         go([$this, 'registerParseData']);
-//        // 注册入库
+        // 注册入库
         go([$this, 'registerInsertOrUpdate']);
         // 启动
-        go([$this, 'main']);
+        go([$this, 'main1']);
 
         return null;
     }
@@ -76,6 +80,17 @@ class FirstSpiderCommand implements CommandInterface
         for ($i=700515;$i<=775497;$i+=10) {
             // 这里如果用多协程的话  saber 并发请求里会一起返回  所以不能这样做
             $this->runRequest($i);
+        }
+
+        $this->end();
+    }
+
+    private function main1()
+    {
+        for ($i=700515;$i<=775497;$i+=10) {
+            // 这里如果用多协程的话  saber 并发请求里会一起返回  所以不能这样做
+//            $this->runRequest($i);
+            $this->jobChan->push($i);
         }
 
         $this->end();
@@ -137,6 +152,7 @@ class FirstSpiderCommand implements CommandInterface
             }
 
             $data = $this->dataChan->pop();
+            continue;
             if (empty($data) || !is_array($data)) {
                 continue;
             }
@@ -153,6 +169,21 @@ class FirstSpiderCommand implements CommandInterface
                 Logger::getInstance()->error(catch_exception($e), 'MYSQL');
             }
 
+        }
+    }
+
+    /**
+     * 注册任务分发
+     */
+    private function dispatchJobs()
+    {
+        while (true) {
+            if ($this->isEnd()) {
+                break;
+            }
+
+            $i = $this->jobChan->pop();
+            $this->runRequest($i);
         }
     }
 
@@ -234,14 +265,16 @@ class FirstSpiderCommand implements CommandInterface
         // 初始化 channel
         $this->dataChan = new Channel(5);
         $this->rawChan  = new Channel(5);
+        $this->jobChan  = new Channel(20);
 
         // 加个定时器 看下chan使用情况
-//        $this->chanLogTick = \Swoole\Timer::tick(5000, function(){
-//            Logger::getInstance()->notice(print_r([
-//                'dataChan' => $this->dataChan->stats(),
-//                'rawChan' => $this->rawChan->stats(),
-//            ], true));
-//        });
+        $this->chanLogTick = \Swoole\Timer::tick(5000, function(){
+            Logger::getInstance()->notice(print_r([
+                'dataChan' => $this->dataChan->stats(),
+                'rawChan' => $this->rawChan->stats(),
+                'jobChan' => $this->jobChan->stats(),
+            ], true));
+        });
 
     }
 
@@ -254,6 +287,7 @@ class FirstSpiderCommand implements CommandInterface
 
         $this->dataChan->close();
         $this->rawChan->close();
+        $this->jobChan->close();
 
         $this->end_time = microtime(true);
         stdout('用时'.($this->end_time - $this->start_time));
