@@ -27,11 +27,21 @@ use EasySwoole\EasySwoole\Logger;
  */
 class TestCommand implements CommandInterface
 {
-    private $baseUrl = 'http://www.ckjdh.pw';
+    private $baseUrl = 'http://www.httpbin.org';
     /** @var Channel */
     private $dataChan; // 入库数据
     /** @var Channel */
     private $rawChan; // 原始数据 需要解析
+    /** @var Channel */
+    private $chan; // 测试用
+    /** @var Channel */
+    private $Xchan; // 测试用
+    /** @var Channel */
+    private $Ychan; // 测试用
+    /** @var Channel */
+    private $Mchan; // 测试用
+    /** @var Channel */
+    private $Nchan; // 测试用
 
     private $start_time;
     private $end_time;
@@ -40,6 +50,28 @@ class TestCommand implements CommandInterface
     private $chanLogTick;
 
     const TABLE = 'spiders_copy2';
+
+    const GET = '/get';
+    const IMG_JPEG = '/image/jpeg';
+    const IMG_PNG = '/image/png';
+    const IMG_SVG = '/image/svg';
+    const IMG_WEBP = '/image/webp';
+
+    const A = [[
+        'uri' => $this->baseUrl . self::GET,
+    ],
+    [
+        'uri' => $this->baseUrl . self::GET,
+    ],
+    [
+        'uri' => $this->baseUrl . self::GET,
+    ],
+    [
+        'uri' => $this->baseUrl . self::GET,
+    ],
+    [
+        'uri' => $this->baseUrl . self::GET,
+    ]];
 
 
     public function commandName(): string
@@ -55,7 +87,63 @@ class TestCommand implements CommandInterface
         $url2 = 'm5.amap.com/ws/mapapi/poi/newbus/?ent=2&in=%2FV1Ruzqqnu%2BLCNlfDiNeK8HcNvIBwD7mkDrXO5l8JcuHWhoImCBJA3YYTVrp1AIMMDXto3825k9hoEX4MwaNFSziHJ6u%2BpLUY6UkoSci1qz5w8zvnOXfGyevNTF6xh0x9U1b%2BLkP%2BBLPBiCQGiBOnwnq7pe65O1yLvdfgPQw%2F%2FMkxyZGFbjr8r9KkVpJigUV9BJs2YFIk46w93m82lLd1mWzV85YCk1alw9Xe7Pb8LLFBLO1zkufRKGgIgLazyEhbViIR3N085QqjtOL8elyPzMUZcDbxbNUzzAbyrLlorw417%2Fu2OMN95J6MxxZgxySS7wT1468Dol17EcqK4%2BKqkm7Oy5DyF%2F%2FD%2FmKmVZ0%2FivB%2BuWw00IlV%2FOnSo2a7p0cPYGAStNFxEcBaUui8%2FLJSsovYU%2FDb%2Bm6b69i86TD0HjggNWtjMOG3Is2njRmB5kjefsqulFSljX0sJAZxZegKEhoiGzE1f%2FFSGU8pDnlGa8zzVzmS2gawhob9lmMfKiGbUXy6LkTwQgyV3Tg1TJxZtU9xlvd05rZU1A1T4Om5ANQr0sEp103ZWDP88HqEITTJN5wZ2pUQs0WIScYVskVpwRy0%2BWWveFNasoosUPZML%2F8SVPPU%2Fl8o9FxXmDxMSHEG1GBoFjhgW6PUUr0sc%2Ft0g8cL7pimPvdsWHM2G4XSSKqar%2FL6Li14WnpnMXUmRqMywQzNjEUbNFLi3Hv8kWn6mE17H7NUmEMJRSPU%2F59Xx6I%2F9NjzyBkBuQRn8RUjWj1jhL4dt1MSoluJZ9vGlYvtEgysE8%2BOloapTl3KPzQiiWT4wf1fns1lqak1V2a3g9EjYODc53cIW1sLtH%2FyXcfTLnQVYRB7Qxicy5gT8jC8oAEJBiZxJxAqA%3D%3D&csid=6c381592-98db-434b-9f05-d51170766e99';
 
 
-        Logger::getInstance()->error(123);
+
+        // Logger::getInstance()->console('asd');
+        $this->chan = new Channel(2);
+        go(function(){
+
+
+            for($i=1;$i<2;$i++){
+                $this->chan->push();
+            }
+
+
+            
+
+            go(function()use($chan){
+                $chan->pop();
+                $urls = [
+                    
+                ];
+                $responses = SaberGM::requests($urls);
+                $result =  "multi-requests [ {$responses->success_num} ok, {$responses->error_num} error ]:" ."consuming-time: {$responses->time}s\n";
+                fwrite(STDOUT, $result);
+            });
+            go(function()use($chan){
+                $chan->pop();
+                $urls = [
+                    [
+                        'uri' => $this->baseUrl . self::GET,
+                    ],
+                    [
+                        'uri' => $this->baseUrl . self::GET,
+                    ],
+                    [
+                        'uri' => $this->baseUrl . self::GET,
+                    ],
+                    [
+                        'uri' => $this->baseUrl . self::GET,
+                    ],
+                    [
+                        'uri' => $this->baseUrl . self::GET,
+                    ],
+                ];
+                $responses = SaberGM::requests($urls);
+                $result =  "multi-requests [ {$responses->success_num} ok, {$responses->error_num} error ]:" ."consuming-time: {$responses->time}s\n";
+                fwrite(STDOUT, $result);
+            });
+
+
+
+            $chan->push(1);
+            $chan->push(2);
+        });
+
+
+
+
+
+        // Logger::getInstance()->error(123);
         return 'test';
         $this->start();
 //        // 注册数据解析
