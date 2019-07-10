@@ -87,10 +87,14 @@ class EasySwooleEvent implements Event
      */
     private static function registerHotReload(EventRegister $register): void
     {
-        ServerManager::getInstance()
-            ->getSwooleServer()
-            ->addProcess((new HotReload(...Config::getInstance()->getConf('HOT_RELOAD')))
-                ->getProcess());
+        $hot_reload_config = Config::getInstance()->getConf('HOT_RELOAD');
+        $is_start = array_shift($hot_reload_config);
+        if (is_bool($is_start) && $is_start) {
+            ServerManager::getInstance()
+                ->getSwooleServer()
+                ->addProcess((new HotReload(...$hot_reload_config))
+                    ->getProcess());
+        }
     }
 
     /**

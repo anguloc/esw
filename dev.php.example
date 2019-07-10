@@ -39,8 +39,11 @@ return [
         'EXCLUDE' => ['.idea', 'Log', 'Temp', 'easyswoole', 'easyswoole.install']
     ],
     'HOT_RELOAD' => [
+        'is_start' => true,
         'HotReload',
-        ['disableInotify' => true],
+        [
+            'disableInotify' => true,
+        ],
     ],
     MYSQL_POOL => [
             'host'                 => '127.0.0.1',//数据库连接ip
