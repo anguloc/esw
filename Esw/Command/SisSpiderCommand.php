@@ -21,14 +21,14 @@ use EasySwoole\EasySwoole\Config;
 use EasySwoole\EasySwoole\Logger;
 
 /**
- * easyswoole + saber 的第一只小蜘蛛
+ * easyswoole + saber 的第二只小蜘蛛
  * 搞一些普（se）通（qing）的数据
- * Class FirstSpiderCommand
+ * Class SisSpiderCommand
  * @package Esw\Command
  */
-class FirstSpiderCommand implements CommandInterface
+class SisSpiderCommand implements CommandInterface
 {
-    private $baseUrl = 'http://www.ckjdh.pw';
+    const BASE_URL = 'https://sis001.com';
     /** @var Channel */
     private $dataChan; // 入库数据
     /** @var Channel */
@@ -47,16 +47,16 @@ class FirstSpiderCommand implements CommandInterface
 
     public function commandName(): string
     {
-        return 'spider_1';
+        return 'spider_sis';
     }
 
     public function exec(array $args): ?string
     {
-        // TODO: 多协程使用saber并发发送请求，未清除之前的请求问题
-        // TODO: 数据库问题。1、多个类型数据；2、重试机制导致异常重复问题
-        // TODO: 目前抓取 目标数据74982条，实际入库76864（包含重复异常，缺失异常数据），有效数据74668
-        // TODO: 结束问题。1、需要等chan为空再close；2、实际未退出
-        // TODO:
+        $url = self::BASE_URL . '/forum/forum-279-1.html';
+        $res = SaberGM::get($url);
+        stdout($res->getBody()->__toString());
+
+        return '';
         $this->start();
         // 注册执行请求
         go([$this, 'dispatchJobs']);
