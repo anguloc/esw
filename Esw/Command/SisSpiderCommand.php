@@ -52,9 +52,11 @@ class SisSpiderCommand implements CommandInterface
 
     public function exec(array $args): ?string
     {
-        $url = self::BASE_URL . '/forum/forum-279-1.html';
-        $res = SaberGM::get($url);
-        stdout($res->getBody()->__toString());
+        go(function() {
+            $url = self::BASE_URL . '/forum/forum-279-1.html';
+            $res = SaberGM::get($url);
+            stdout($res->getBody()->__toString());
+        });
 
         return '';
         $this->start();
