@@ -118,7 +118,7 @@ class EasySwooleEvent implements Event
         ) {
             if ($throwable instanceof InvalidDataException && ($client instanceof Tcp || $client instanceof Udp)) {
                 // 数据解析错误
-                $response->setMessage(createReturn(WARN_CODE, 'invalid data'));
+                $response->setMessage(create_return(WARN_CODE, 'invalid data'));
                 $data = $conf->getParser()->encode($response, $client);
                 if ($server->exist($client->getFd())) {
                     $server->send($client->getFd(), $data);

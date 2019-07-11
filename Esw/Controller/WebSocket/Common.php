@@ -11,7 +11,7 @@ class Common extends Controller
 {
     public function ping()
     {
-        $result = createReturn(SUCCESS_CODE, [], '', ['method' => __FUNCTION__]);
+        $result = create_return(SUCCESS_CODE, [], '', ['method' => __FUNCTION__]);
         $this->response()->setMessage($result);
     }
 
