@@ -57,7 +57,6 @@ class SisSpiderCommand implements CommandInterface
             $res = SaberGM::get($url);
             Logger::getInstance()->log($res->getBody()->__toString());
 
-            stdout($res->getBody()->__toString());
         });
 
         return '';
