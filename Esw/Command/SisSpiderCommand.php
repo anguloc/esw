@@ -55,6 +55,8 @@ class SisSpiderCommand implements CommandInterface
         go(function() {
             $url = self::BASE_URL . '/forum/forum-279-1.html';
             $res = SaberGM::get($url);
+            Logger::getInstance()->log($res->getBody()->__toString());
+
             stdout($res->getBody()->__toString());
         });
 
