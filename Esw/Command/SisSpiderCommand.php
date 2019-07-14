@@ -42,7 +42,7 @@ class SisSpiderCommand implements CommandInterface
 
     private $chanLogTick;
 
-    const TABLE = 'spiders_copy2';
+    const TABLE = 'spiders_sis';
 
 
     public function commandName(): string
@@ -52,18 +52,36 @@ class SisSpiderCommand implements CommandInterface
 
     public function exec(array $args): ?string
     {
-        go(function() {
-            $url = self::BASE_URL . '/forum/forum-279-1.html';
-            $res = SaberGM::get($url);
-            Logger::getInstance()->log($res->getBody()->__toString());
-
-        });
-
-        return '';
+//        $html = file_get_contents(EASYSWOOLE_LOG_DIR . '/log.log');
+//
+//
+//        $regx = '/<tbody id=\"normalthread_\w*\".*?<em>(.*?)<\/em>.*?<span id="thread_.*?"><a href="(thread-.*?.html)">(.*?)<\/a>.*?<\/tbody>/s';
+//        preg_match_all($regx, $html, $matches);
+//
+//        foreach ($matches[1] as &$match) {
+//            $match = str_replace(['[',']'], '', strip_tags($match));
+//        }
+//
+//        print_r($matches);
+//
+//
+//
+//        return '';
+//        SaberGM::default([
+//            'iconv' => ['gbk', 'utf-8', true],
+//        ]);
+//
+//
+//        go(function() {
+//            $url = self::BASE_URL . '/forum/forum-279-1.html';
+//            $res = SaberGM::get($url);
+//            Logger::getInstance()->log($res->getBody()->__toString());
+//
+//        });
+//
+//        return '';
         $this->start();
         // 注册执行请求
-        go([$this, 'dispatchJobs']);
-        go([$this, 'dispatchJobs']);
         go([$this, 'dispatchJobs']);
         // 注册数据解析
         go([$this, 'registerParseData']);
