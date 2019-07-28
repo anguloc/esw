@@ -283,7 +283,7 @@ class FirstSpiderCommand implements CommandInterface
 
     private function end()
     {
-        // todo: 清空各项任务
+        // todo: 清空各项任务  这个判断比较麻烦   调试阶段也不重要 直接先wait 20s
         $this->end = true;
 
         \Swoole\Coroutine::sleep(20);
