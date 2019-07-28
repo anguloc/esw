@@ -6,6 +6,7 @@ use EasySwoole\Socket\AbstractInterface\ParserInterface;
 use EasySwoole\Socket\Client\WebSocket;
 use EasySwoole\Socket\Bean\Caller;
 use EasySwoole\Socket\Bean\Response;
+use Esw\Exception\InvalidDataException;
 
 /**
  * Class WebSocketParser
@@ -24,17 +25,17 @@ class WebSocketParser implements ParserInterface
      * @param  string $raw 客户端原始消息
      * @param  WebSocket $client WebSocket Client 对象
      * @return Caller         Socket  调用对象
+     * @throws InvalidDataException
      */
     public function decode($raw, $client): ?Caller
     {
 // 解析 客户端原始消息
         $data = json_decode($raw, true);
         if (!is_array($data)) {
-            echo "decode message error! \n";
-            return null;
+            throw new InvalidDataException('decode message error!');
         }
 
-// new 调用者对象
+        // new 调用者对象
         $caller = new Caller();
         /**
          * 设置被调用的类 这里会将ws消息中的 class 参数解析为具体想访问的控制器
@@ -43,6 +44,8 @@ class WebSocketParser implements ParserInterface
          */
         $class = '\\Esw\Controller\WebSocket\\' . ucfirst($data['moudle'] ?? 'Index');
         $caller->setControllerClass($class);
+
+        // TODO 这里应该通过反射进行加载  这个不是必须  先这样玩
 
 // 提供一个事件风格的写法
 //         $eventMap = [
@@ -74,6 +77,12 @@ class WebSocketParser implements ParserInterface
          * 这里返回响应给客户端的信息
          * 这里应当只做统一的encode操作 具体的状态等应当由 Controller处理
          */
-        return $response->getMessage();
+        $message = $response->getMessage();
+        if (empty($message)) {
+            return null;
+        } elseif (is_array($message) || is_object($message)) {
+            $message = json_encode($message, JSON_UNESCAPED_UNICODE);
+        }
+        return $message;
     }
 }

@@ -6,7 +6,7 @@
  * Time: 22:33
  */
 
-namespace Esw\Exception\InvalidDataException;
+namespace Esw\Exception;
 
 use Exception;
 
@@ -17,5 +17,8 @@ use Exception;
  */
 class InvalidDataException extends Exception
 {
-
+    public function __construct($message = "", $code = 500, \Throwable $previous = null)
+    {
+        parent::__construct($message, $code, $previous);
+    }
 }
