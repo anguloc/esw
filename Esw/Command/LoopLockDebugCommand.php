@@ -24,13 +24,17 @@ use EasySwoole\RedisPool\Redis as RedisPool;
 use EasySwoole\Component\Timer;
 
 /**
- * 测试一些玩法
- * Class TestCommand
+ * 复现一个bug
+ * Class LoopLockDebugCommand
  * @package Esw\Command
  */
 class LoopLockDebugCommand implements CommandInterface
 {
 
+    /**
+     * 12个粒度
+     * @var array
+     */
     private $granularity_list = array(
         1 * 60,
         3 * 60,
@@ -46,29 +50,29 @@ class LoopLockDebugCommand implements CommandInterface
         7 * 24 * 3600,
     );
 
-    const LOCK_LOOP_DEBUG_KEY = 'lock_loop_debug_';
+    /**
+     * 用于redis锁
+     */
     const PERIOD_KEY = 'loop_lock_bug_init';
+    /**
+     * 用于redis锁
+     */
     const RESET_PERIOD_INC_KEY = 'reset_period_inc_key';
 
+    /**
+     * 运行command
+     * @return string
+     */
     public function commandName(): string
     {
         return 'loop_lock_bug';
     }
 
-    public function getPeriod()
-    {
-        $atomic = AtomicManager::getInstance()->get(self::PERIOD_KEY);
-
-        $y = $atomic->get();
-        if ($y > (count($this->granularity_list) - 1)) {
-            $y = 0;
-            $atomic->set(0);
-        }
-        $atomic->add(1);
-
-        return isset($this->granularity_list[$y]) ? $this->granularity_list[$y] : $this->granularity_list[0];
-    }
-
+    /**
+     * 执行
+     * @param array $args
+     * @return null|string
+     */
     public function exec(array $args): ?string
     {
         Timer::getInstance()->loop(1000, function () {
@@ -117,6 +121,27 @@ class LoopLockDebugCommand implements CommandInterface
         return true;
     }
 
+    /**
+     * 获取粒度
+     * @return mixed
+     */
+    private function getPeriod()
+    {
+        $atomic = AtomicManager::getInstance()->get(self::PERIOD_KEY);
+
+        $y = $atomic->get();
+        if ($y > (count($this->granularity_list) - 1)) {
+            $y = 0;
+            $atomic->set(0);
+        }
+        $atomic->add(1);
+
+        return isset($this->granularity_list[$y]) ? $this->granularity_list[$y] : $this->granularity_list[0];
+    }
+
+    /**
+     * 回滚粒度
+     */
     private function resetPeriod()
     {
         $atomic_inc = AtomicManager::getInstance()->get(self::RESET_PERIOD_INC_KEY);
@@ -137,6 +162,12 @@ class LoopLockDebugCommand implements CommandInterface
         }
     }
 
+    /**
+     * 加锁
+     * @param $key
+     * @param $ttl
+     * @return int|mixed
+     */
     private function lock($key, $ttl)
     {
         mt_srand();
@@ -148,6 +179,11 @@ class LoopLockDebugCommand implements CommandInterface
         return $ok ? $random : $ok;
     }
 
+    /**
+     * 解锁
+     * @param $key
+     * @param $random
+     */
     private function unlock($key, $random)
     {
         RedisPool::invoker(REDIS_POOL, function (\EasySwoole\RedisPool\Connection $redis) use ($key, $random) {
@@ -155,11 +191,6 @@ class LoopLockDebugCommand implements CommandInterface
                 $redis->del($key);
             }
         });
-//        RedisPool::getInstance()->pool(REDIS_POOL)::defer();
-//        $redis = RedisPool::defer(REDIS_POOL);
-//        if ($redis->get($key) == $random) {
-//            $redis->del($key);
-//        }
     }
 
 }
