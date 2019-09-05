@@ -21,6 +21,9 @@ use EasySwoole\Socket\Dispatcher;
 use EasySwoole\MysqliPool\Mysql as MysqlPool;
 use EasySwoole\MysqliPool\MysqlPoolException;
 use EasySwoole\Mysqli\Config as MysqlConfig;
+use EasySwoole\RedisPool\Redis as RedisPool;
+use EasySwoole\RedisPool\RedisPoolException;
+use EasySwoole\RedisPool\Config as RedisConfig;
 use Esw\Exception\InvalidDataException;
 use Esw\Parser\WebSocketParser;
 use Esw\Process\HotReload;
@@ -39,6 +42,8 @@ class EasySwooleEvent implements Event
         self::changeEasySwoole();
         // mysql 连接池
         self::registerMysqlPool();
+        // redis 连接池
+        self::registerRedisPool();
         // 自定义command
         self::registerMyCommand();
     }
@@ -157,9 +162,37 @@ class EasySwooleEvent implements Event
         try {
             // mysql
             $configData = Config::getInstance()->getConf(MYSQL_POOL);
+            if(!$configData){
+                return;
+            }
             $config = new MysqlConfig($configData);
             $poolConf = MysqlPool::getInstance()->register(MYSQL_POOL, $config);
         } catch (MysqlPoolException $e) {
+            $error = '';
+            $error .= '错误类型：' . get_class($e) . PHP_EOL;
+            $error .= '错误代码：' . $e->getCode() . PHP_EOL;
+            $error .= '错误信息：' . $e->getMessage() . PHP_EOL;
+            $error .= '错误堆栈：' . $e->getTraceAsString() . PHP_EOL;
+            if (Core::getInstance()->isDev()) {
+                stdout($error);
+            }
+        }
+    }
+
+    /**
+     * 注册redis 连接池
+     */
+    private static function registerRedisPool()
+    {
+        try {
+            // redis
+            $configData = Config::getInstance()->getConf(REDIS_POOL);
+            if(!$configData){
+                return;
+            }
+            $config = new RedisConfig($configData);
+            $poolConf = RedisPool::getInstance()->register(REDIS_POOL, $config);
+        } catch (RedisPoolException $e) {
             $error = '';
             $error .= '错误类型：' . get_class($e) . PHP_EOL;
             $error .= '错误代码：' . $e->getCode() . PHP_EOL;
