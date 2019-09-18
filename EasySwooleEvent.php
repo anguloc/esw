@@ -27,6 +27,7 @@ use EasySwoole\RedisPool\Config as RedisConfig;
 use Esw\Exception\InvalidDataException;
 use Esw\Parser\WebSocketParser;
 use Esw\Process\HotReload;
+use Esw\Process\SubRedis;
 use Esw\Util\Logger as MyLogger;
 
 
@@ -55,7 +56,10 @@ class EasySwooleEvent implements Event
     public static function mainServerCreate(EventRegister $register)
     {
         // TODO: Implement mainServerCreate() method.
-
+        ServerManager::getInstance()
+            ->getSwooleServer()
+            ->addProcess((new SubRedis())
+                ->getProcess());
         self::registerHotReload($register);
         self::registerWebSocket($register);
     }

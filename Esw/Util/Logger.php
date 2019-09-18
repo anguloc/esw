@@ -25,6 +25,9 @@ class Logger implements LoggerInterface
 
     function log(?string $msg,int $logLevel = self::LOG_LEVEL_INFO,string $category = 'DEBUG'):string
     {
+        if (is_array($msg) || is_object($msg)) {
+            $msg = json_encode($msg, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+        }
         $date = date('Y-m-d H:i:s');
         $levelStr = $this->levelMap($logLevel);
         $filePath = $this->logDir."/log.log";

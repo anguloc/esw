@@ -18,7 +18,7 @@ use Swoole\Timer;
 /**
  * 暴力热重载
  * Class HotReload
- * @package App\Process
+ * @package Esw\Process
  */
 class HotReload extends AbstractProcess
 {
