@@ -16,9 +16,11 @@ use Swoole\Process;
 use Swoole\Table;
 use Swoole\Timer;
 use EasySwoole\EasySwoole\Logger;
+use EasySwoole\RedisPool\Redis as RedisPool;
 
 /**
- * 暴力热重载
+ * redis订阅
+ *
  * Class SubRedis
  * @package Esw\Process
  */
@@ -36,13 +38,55 @@ class SubRedis extends AbstractProcess
      */
     public function run($arg)
     {
-        Timer::tick(1000, function(){
-            Logger::getInstance()->log('test process ' . \EasySwoole\Utility\Random::character());
-        });
+//        go(function() {
+//            Timer::tick(1000, function () {
+//                Logger::getInstance()->log('test process ' . \EasySwoole\Utility\Random::character());
+//            });
+//        });
+//        return '';
+        go(function(){
+//            Logger::getInstance()->log(json_encode(['sub' => 'bcvxasdf']));
+            $redis = RedisPool::defer(REDIS_POOL);
 
-//        while (1) {
+
+            $redis->set('exist', 1);
+
+//            $a = $redis->keys('*');
+//            var_dump($a);
 //
-//        }
+//
+//
+//            Logger::getInstance()->log(json_encode(['sub' => 'bcvxasdf']));
+            $b = $redis->subscribe(['test']);
+            Logger::getInstance()->log(json_encode(['sub' => $b]));
+            if($b){
+//                $a = $redis->keys('*');
+//                $aa = $redis->set('zxc',456);
+//                $aaa = $redis->get('zxc');
+//                var_dump($a);
+//                var_dump($aa);
+//                var_dump($aaa);
+//                echo 123,PHP_EOL;
+                while(true){
+//                    $a = $redis->get('exist');
+//                    Logger::getInstance()->log('asdasd:'.$a);
+
+                    $msg = $redis->recv();
+                    $msg = is_array($msg) ? json_encode($msg) : $msg;
+                    Logger::getInstance()->log($msg);
+                }
+//                while($msg = $redis->recv()){
+//                    print_r($msg);
+//                }
+            }
+//            var_dump($b);
+//            Logger::getInstance()->log($b);
+//            while($msg = $redis->recv()){
+//                echo 123123213;
+//                Logger::getInstance()->log(json_encode($msg));
+//            }
+//            Logger::getInstance()->log('end');
+        });
     }
 
 

@@ -58,7 +58,7 @@ class EasySwooleEvent implements Event
         // TODO: Implement mainServerCreate() method.
         ServerManager::getInstance()
             ->getSwooleServer()
-            ->addProcess((new SubRedis())
+            ->addProcess((new SubRedis('esw-redis'))
                 ->getProcess());
         self::registerHotReload($register);
         self::registerWebSocket($register);
