@@ -20,6 +20,7 @@ use Swlib\SaberGM;
 use Swlib\Http\Exception\RequestException;
 use EasySwoole\EasySwoole\Config;
 use EasySwoole\EasySwoole\Logger;
+use Swoole\Timer;
 
 /**
  * 测试一些玩法
@@ -73,6 +74,162 @@ class TestCommand implements CommandInterface
 
     public function exec(array $args): ?string
     {
+
+        $normal_queue_name = "php:normal_queue_name";
+
+        // check env
+        $pid_dir = ROOT_PATH . "/zhichi/protected/commands/bin/rabbitmq/pid/";
+        $pid_file = $pid_dir . $normal_queue_name . ".pid";
+        if (!file_exists($pid_dir)) {
+            exec("mkdir -p {$pid_dir} && chmod 777 -R {$pid_dir}");
+        }
+
+        if ((is_writable($log_file) && is_writable($error_log_file) && is_writable($pid_dir) && is_writable($pid_file))) {
+            echo "文件 {$log_file}, {$error_log_file}, {$pid_dir}, {$pid_file} 不可写" . PHP_EOL;
+            exit;
+        }
+
+        // check queue config
+        list($servers, $queue_name, $timeout_queue_name, $exchange_name, $callback, $consumers, $trace, $queue_timeout, $memory_limit) = static::getQueueConfig($queue_index);
+        if (!empty($timeout_queue_name) && $queue_timeout < 0) {
+            echo "error QueueConfig, queue_name={$queue_name}" . PHP_EOL;
+            exit;
+        }
+
+        global $argc;
+        global $argv;
+        if ($argc == 1) {
+            $argc += 1;
+            $argv[] = "start";
+        }
+
+        Worker::$stdoutFile = $log_file;
+        Worker::$logFile = $workerman_log_file;
+        Worker::$pidFile = $pid_file;
+        Worker::$daemonize = true;
+        $worker = new Worker();
+        $worker->count = $consumers;
+        $worker->name = $normal_queue_name;
+        $worker->onWorkerStart = function (Worker $worker) use ($queue_index, $parent_error_reporting, $memory_limit) {
+            if ($memory_limit) {
+                ini_set("memory_limit", $memory_limit);
+            }
+            error_reporting($parent_error_reporting);
+            self::do_listen($queue_index);
+        };
+        Worker::runAll();
+
+
+        $_SERVER['SERVER_ADDR'] = getHostByName(getHostName());
+        list($servers, $queue_name, $timeout_queue_name, $exchange_name, $callback, $consumers, $trace, $queue_timeout) = static::getQueueConfig($queue_index);
+
+        // 随机选一个 server
+        $server = self::selectServer($servers);
+        $host = RabbitmqConfig::$arrServers[$server]['host'];
+        $port = RabbitmqConfig::$arrServers[$server]['port'];
+        $user = RabbitmqConfig::$arrServers[$server]['user'];
+        $pass = RabbitmqConfig::$arrServers[$server]['password'];
+
+        // 直连本机
+        //$host = '0.0.0.0';
+        //$port = 5672;
+        //$user = 'guest';
+        //$pass = 'uB8!yDEmpeh9';
+
+        $connection = new AMQPStreamConnection($host, $port, $user, $pass);
+        $channel = $connection->channel();
+
+        $channel->exchange_declare("dead_exchanger", self::$dead_exchanger_type, self::$exchanger_passive, self::$exchanger_durable, self::$exchanger_auto_delete);
+
+        $channel->exchange_declare($exchange_name, self::$exchanger_type, self::$exchanger_passive, self::$exchanger_durable, self::$exchanger_auto_delete);
+        if (empty($timeout_queue_name)) {
+            $channel->queue_declare($queue_name, self::$queue_passive, self::$queue_durable, false, self::$queue_auto_delete);
+            $channel->queue_bind($queue_name, $exchange_name);
+        } else if ($queue_timeout != -1) {  // 如果有 dead queue，且 timeout 的定义不为空
+            // 定义超时删除并自动进入死信(超时)队列的消息属性
+            $route_key = $queue_name;
+            $queue_args = new AMQPTable([
+                'x-message-ttl' => $queue_timeout,
+                'x-dead-letter-exchange' => self::$dead_exchanger_name,
+                'x-dead-letter-routing-key' => $route_key
+            ]);
+
+            $channel->queue_declare($queue_name, self::$queue_passive, self::$queue_durable, false, self::$queue_auto_delete, false, $queue_args);
+            $channel->queue_declare($timeout_queue_name, self::$queue_passive, self::$queue_durable, false, self::$queue_auto_delete);  // 声明一个延时队列
+
+            $channel->queue_bind($queue_name, $exchange_name);
+            $channel->queue_bind($timeout_queue_name, self::$dead_exchanger_name, $route_key);  // 绑定死信（超时）队列的路径
+        }
+
+        $consume = function ($msg) use ($callback, $channel, $trace, $queue_name) {
+            try {
+                // 设置上下文 LogId
+                $contextLogId = json_decode($msg->body, true)['context_log_id'];
+                if ($contextLogId) {
+                    \Loggers::getInstance("rabbitmq_task")->setLogId($contextLogId);
+                }
+                if ($trace) {
+                    \Loggers::getInstance("rabbitmq_task")->notice("run rabbitmq handler: [queue_name {$queue_name}] param=" . $msg->body);
+                }
+                $res = call_user_func($callback, $msg->body);
+                if ((is_bool($res) && $res == false) || (is_array($res) && $res['status'] != 0)) {
+                    \Loggers::getInstance('rabbitmq_task')->warning("rabbitmq task run error: {$msg->body}, res: " . json_encode($res));
+                }
+            } catch (RabbitmqRequeueException $queue_exception) {  // 重新入队（该消息的 handler 会重新运行）
+                \Loggers::getInstance('rabbitmq_task')->warning("rabbitmq task requeue: [queue_name {$queue_name}] {$msg->body}");
+                $channel->basic_nack($msg->delivery_info['delivery_tag'], false, true); // 发送信号提醒mq该消息不能被删除，且重新入队列
+                return;
+            } catch (Exception $e) {
+                $exceptionInfoStr = "{$e->getFile()} {$e->getLine()} {$e->getMessage()}";
+                \Loggers::getInstance('rabbitmq_task')->warning("rabbitmq task catch error: [queue_name {$queue_name}] {$msg->body}, exception: {$exceptionInfoStr}");
+            }
+            $channel->basic_ack($msg->delivery_info['delivery_tag']);   // 发送信号提醒mq可删除该信息
+        };
+
+        $channel->basic_qos(null, 1, null); // 设置一次只从queue取一条信息，在该信息处理完（消费者没有发送ack给mq），queue将不会推送信息给该消费者
+
+        // no_ack:false 表示该队列的信息必须接收到消费者信号才能被删除
+        // 消费者从queue拿到信息之后，该信息不会从内存中删除，需要消费者处理完之后发送信号通知mq去删除消息（如果没此通知，queue会不断积累旧的信息不会删除）
+        // 超时队列：推送message到消息队列，但不主动去该队列获取message,等到ttl超时，自动进入绑定的死信队列，在死信队列处理业务
+        if (empty($timeout_queue_name)) {
+            $channel->basic_consume($queue_name, '', false, false, false, false, $consume);
+        } else {
+            $channel->basic_consume($timeout_queue_name, '', false, false, false, false, $consume);
+        }
+
+        while (count($channel->callbacks)) {
+            $channel->wait();
+        }
+
+        $channel->close();
+        $connection->close();
+        exit;
+
+
+        return 1;
+
+
+        swoole_set_process_name('eeee');
+
+        $process = new \Swoole\Process(function(){
+            Timer::tick(1000, function(){
+                Logger::getInstance()->log(123);
+            });
+
+
+
+
+
+
+
+        },null,0,true);
+
+
+
+        return $process->start();
+
+
+        return 'asdsad';
 
 //        go(function(){
 //            $redis_config = Config::getInstance()->getConf(REDIS_POOL);

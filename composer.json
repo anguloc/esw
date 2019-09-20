@@ -6,7 +6,8 @@
         "easyswoole/actor": "^2.0",
         "easyswoole/redis-pool": "^1.0",
         "easyswoole/mysqli-pool": "^1.0",
-        "swlib/saber": "^1.0"
+        "swlib/saber": "^1.0",
+        "php-amqplib/php-amqplib": "^2.10"
     },
     "autoload": {
         "psr-4": {

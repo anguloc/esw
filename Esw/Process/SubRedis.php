@@ -45,47 +45,34 @@ class SubRedis extends AbstractProcess
 //        });
 //        return '';
         go(function(){
-//            Logger::getInstance()->log(json_encode(['sub' => 'bcvxasdf']));
             $redis = RedisPool::defer(REDIS_POOL);
-
+            $key = 1;
 
             $redis->set('exist', 1);
-
-//            $a = $redis->keys('*');
-//            var_dump($a);
-//
-//
-//
-//            Logger::getInstance()->log(json_encode(['sub' => 'bcvxasdf']));
             $b = $redis->subscribe(['test']);
-            Logger::getInstance()->log(json_encode(['sub' => $b]));
+            Logger::getInstance()->log(json_encode(['sub' => $b,'key' => $key]));
             if($b){
-//                $a = $redis->keys('*');
-//                $aa = $redis->set('zxc',456);
-//                $aaa = $redis->get('zxc');
-//                var_dump($a);
-//                var_dump($aa);
-//                var_dump($aaa);
-//                echo 123,PHP_EOL;
                 while(true){
-//                    $a = $redis->get('exist');
-//                    Logger::getInstance()->log('asdasd:'.$a);
-
                     $msg = $redis->recv();
                     $msg = is_array($msg) ? json_encode($msg) : $msg;
-                    Logger::getInstance()->log($msg);
+                    Logger::getInstance()->log($msg . '--key:'.$key);
                 }
-//                while($msg = $redis->recv()){
-//                    print_r($msg);
-//                }
             }
-//            var_dump($b);
-//            Logger::getInstance()->log($b);
-//            while($msg = $redis->recv()){
-//                echo 123123213;
-//                Logger::getInstance()->log(json_encode($msg));
-//            }
-//            Logger::getInstance()->log('end');
+        });
+        go(function(){
+            $redis = RedisPool::defer(REDIS_POOL);
+            $key = 2;
+
+            $redis->set('exist', 1);
+            $b = $redis->subscribe(['test']);
+            Logger::getInstance()->log(json_encode(['sub' => $b,'key' => $key]));
+            if($b){
+                while(true){
+                    $msg = $redis->recv();
+                    $msg = is_array($msg) ? json_encode($msg) : $msg;
+                    Logger::getInstance()->log($msg . '--key:'.$key);
+                }
+            }
         });
     }
 
