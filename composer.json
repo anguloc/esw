@@ -14,9 +14,7 @@
             "Esw\\": "Esw/"
         },
         "files": [
-            "../common/files/Constants.php",
-            "../common/files/Helpers.php",
-            "../common/config/Constants.php"
+            "../common/autoloader.php"
         ]
     }
 }
