@@ -8,12 +8,13 @@
 
 namespace Esw\Command;
 
-use common\exceptions\Rabbitmq\RabbitmqRequeueException;
+use DHelper\RabbitMQ\RabbitMQRequeueException;
 use EasySwoole\EasySwoole\Command\CommandInterface;
 use EasySwoole\MysqliPool\Mysql as MysqlPool;
 use EasySwoole\RedisPool\Redis as RedisPool;
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Wire\AMQPTable;
+use PhpOffice\PhpWord\Style\Tab;
 use Swlib\Http\Exception\ClientException;
 use Swlib\Http\Exception\ConnectException;
 use Swlib\Http\Exception\HttpExceptionMask;
@@ -23,7 +24,10 @@ use Swlib\SaberGM;
 use Swlib\Http\Exception\RequestException;
 use EasySwoole\EasySwoole\Config;
 use EasySwoole\EasySwoole\Logger;
+use Swoole\Table;
 use Swoole\Timer;
+use DHelper\RabbitMQ\RabbitMQTask;
+use Swoole\Process;
 
 /**
  * 进程控制
@@ -33,58 +37,12 @@ use Swoole\Timer;
  */
 class ProcessCommand implements CommandInterface
 {
+    private $masterPid;
 
-    public static $dead_exchanger_type = 'direct';
-    public static $dead_exchanger_name = 'dead_exchanger';
+    private static $pool = [];
 
-    public static $exchanger_type        = 'direct';
-    public static $exchanger_passive     = false;
-    public static $exchanger_durable     = true;
-    public static $exchanger_auto_delete = false;
-
-    public static $queue_passive     = false;
-    public static $queue_durable     = true;
-    public static $queue_auto_delete = false;
-    public static $queue_exclusive   = false;
-
-    public static $message_mandatory = true;
-
-    const BASE_URL = 'http://www.httpbin.org';
-    /** @var Channel */
-    private $dataChan; // 入库数据
-    /** @var Channel */
-    private $rawChan; // 原始数据 需要解析
-    /** @var Channel */
-    private $chan; // 测试用
-    /** @var Channel */
-    private $Xchan; // 测试用
-    /** @var Channel */
-    private $Ychan; // 测试用
-    /** @var Channel */
-    private $Mchan; // 测试用
-    /** @var Channel */
-    private $Nchan; // 测试用
-
-    private $start_time;
-    private $end_time;
-    private $end = false;
-
-    private $chanLogTick;
-
-    const TABLE = 'spiders_copy2';
-
-    const GET = '/get';
-    const IMG_JPEG = '/image/jpeg';
-    const IMG_PNG = '/image/png';
-    const IMG_SVG = '/image/svg';
-    const IMG_WEBP = '/image/webp';
-
-    private $foo;
-    private $bar;
-    private $x;
-    private $y;
-    private $m;
-    private $n;
+    private static $processConfig = [];
+    private static $queueMsgKey = "8755";
 
 
     public function commandName(): string
@@ -92,35 +50,122 @@ class ProcessCommand implements CommandInterface
         return 'process';
     }
 
-    public function exec(array $args): ?string
-    {
-//        swoole_set_process_name('eeee');
-
-//        $process = new \Swoole\Process(function(){
-
-            $this->main();
-
-            die();
-
-
-//        },null,0,true);
-
-
-
-        return $process->start();
-
-        return 'test';
-    }
-
     public function help(array $args): ?string
     {
-        return '测试一些玩法';
+        return '玩玩进程以及队列等';
+    }
+
+    public function exec(array $args): ?string
+    {
+        /** init */
+        $this->init($args);
+
+        /** cmd */
+        $cmd = array_shift($args);
+        if ($cmd) {
+            $class = self::$processConfig['process'][$cmd] ?? null;
+            if (!$class || !class_exists($class)) {
+                return '参数错误或者配置错误';
+            }
+            try {
+                $queue = msg_get_queue(self::$queueMsgKey);
+                if (!$queue) {
+                    return '获取队列错误';
+                }
+                $data = json_encode([
+                    'class' => $class,
+                    'args' => $args,
+                ], JSON_UNESCAPED_UNICODE);
+                if (!msg_send($queue, 1, $data, false, false, $error_code)) {
+                    return "send fail error_code is {$error_code}";
+                }
+            } catch (\Throwable $e) {
+                return '发送消息失败';
+            }
+            return 'success';
+        }
+
+        /** Master */
+        $this->startMaster($args);
+
+        return '';
+    }
+
+    private function init(array $args)
+    {
+        self::initProcessConfig();
+
+
+    }
+
+    private function startMaster(array $args)
+    {
+        /** @see __start */
+        $process = new Process([$this, '__start'], false, 0, true);
+        $process->useQueue(self::$queueMsgKey, 2 | Process::IPC_NOWAIT);
+
+        $process->start();
+    }
+
+    public function __start(Process $process)
+    {
+        self::setProcessName('Esw-Process-Master');
+
+        Process::signal(SIGCHLD, function($sig) {
+            while($ret =  Process::wait(false)) {
+
+            }
+        });
+
+        Process::signal(SIGTERM, function () use ($process) {
+            go(function () use ($process) {
+                swoole_event_del($process->pipe);
+                $channel = new Channel(8);
+                go(function () use ($channel) {
+                    try {
+                        $channel->push($this->onShutDown());
+                    } catch (\Throwable $throwable) {
+                        $this->onException($throwable);
+                    }
+                });
+                $channel->pop(3);
+                swoole_event_exit();
+                Process::signal(SIGTERM, null);
+                $process->exit(0);
+            });
+        });
+        swoole_event_add($process->pipe, function () use ($process) {
+            try {
+                $this->onPipeReadable($process);
+            } catch (\Throwable $throwable) {
+                $this->onException($throwable);
+            }
+        });
+
+        // 队列
+        go(function()use($process){
+            Timer::tick(3000, function () use ($process) {
+                if ($msg = $process->pop()) {
+//                    self::log('msg-'.$msg);
+                    new Process();
+                }
+            });
+        });
+
+
+    }
+
+    private function startChildProcess($msg)
+    {
+        $class = self::$processConfig['process'][$cmd] ?? null;
+        if (!$class || !class_exists($class)) {
+            return '参数错误或者配置错误';
+        }
     }
 
 
-    public function main()
+    public function main($num = 1)
     {
-
 
         $normal_queue_name = "php:normal_queue_name";
 
@@ -132,8 +177,9 @@ class ProcessCommand implements CommandInterface
         $timeout_queue_name = '';
         $queue_timeout = '';
 
-        $callback = function(){
-            Logger::getInstance()->log('rabbitmq-qqqq'. json_encode(func_get_args()));
+        $callback = function () use ($num) {
+            Logger::getInstance()->log('rabbitmq-qqqq-' . $num . '-' . json_encode(func_get_args()));
+            return ['status' => 1, 'data' => 'zxhdfgsf'];
         };
 
         if (!empty($timeout_queue_name) && $queue_timeout < 0) {
@@ -151,6 +197,7 @@ class ProcessCommand implements CommandInterface
         $pass = $rabbitmq_config['password'];
 
         $connection = new AMQPStreamConnection($host, $port, $user, $pass);
+
         $channel = $connection->channel();
 
         $channel->exchange_declare("dead_exchanger", self::$dead_exchanger_type, self::$exchanger_passive, self::$exchanger_durable, self::$exchanger_auto_delete);
@@ -177,16 +224,19 @@ class ProcessCommand implements CommandInterface
 
         $consume = function ($msg) use ($callback, $channel, $queue_name) {
             try {
+                self::log('wait');
                 // 设置上下文 LogId
-                $contextLogId = json_decode($msg->body, true)['context_log_id'];
-                if ($contextLogId) {
-                    Logger::getInstance()->log($contextLogId);
-                }
+//                $contextLogId = json_decode($msg->body, true)['context_log_id'];
+//                if ($contextLogId) {
+//                    Logger::getInstance()->log($contextLogId);
+//                }
                 $res = call_user_func($callback, $msg->body);
                 if ((is_bool($res) && $res == false) || (is_array($res) && $res['status'] != 0)) {
-                    Logger::getInstance()->log("rabbitmq task run error: {$msg->body}, res: " . json_encode($res));
+//                    Logger::getInstance()->log("rabbitmq task run error: {$msg->body}, res: " . json_encode($res));
                 }
-            } catch (RabbitmqRequeueException $queue_exception) {  // 重新入队（该消息的 handler 会重新运行）
+                $channel->basic_nack($msg->delivery_info['delivery_tag'], false, true);
+                return ['status' => 1, 'data' => 'zxjhsetert',];
+            } catch (RabbitMQRequeueException $queue_exception) {  // 重新入队（该消息的 handler 会重新运行）
                 Logger::getInstance()->log("rabbitmq task requeue: [queue_name {$queue_name}] {$msg->body}");
                 $channel->basic_nack($msg->delivery_info['delivery_tag'], false, true); // 发送信号提醒mq该消息不能被删除，且重新入队列
                 return;
@@ -194,6 +244,7 @@ class ProcessCommand implements CommandInterface
                 $exceptionInfoStr = "{$e->getFile()} {$e->getLine()} {$e->getMessage()}";
                 Logger::getInstance()->log("rabbitmq task catch error: [queue_name {$queue_name}] {$msg->body}, exception: {$exceptionInfoStr}");
             }
+            return ['status' => 1, 'data' => 'zxjhsetert1111',];
             $channel->basic_ack($msg->delivery_info['delivery_tag']);   // 发送信号提醒mq可删除该信息
         };
 
@@ -207,7 +258,6 @@ class ProcessCommand implements CommandInterface
         } else {
             $channel->basic_consume($timeout_queue_name, '', false, false, false, false, $consume);
         }
-
         while (count($channel->callbacks)) {
             $channel->wait();
         }
@@ -215,6 +265,53 @@ class ProcessCommand implements CommandInterface
         $channel->close();
         $connection->close();
 
+    }
+
+    protected function onException(\Throwable $throwable, ...$args)
+    {
+        Logger::getInstance()->log('exceotion' . catch_exception($throwable));
+    }
+
+    protected function onShutDown()
+    {
+        Logger::getInstance()->log('shotdown');
+    }
+
+    protected function onPipeReadable(Process $process)
+    {
+        /*
+         * 由于Swoole底层使用了epoll的LT模式，因此swoole_event_add添加的事件监听，
+         * 在事件发生后回调函数中必须调用read方法读取socket中的数据，否则底层会持续触发事件回调。
+         */
+        Logger::getInstance()->log('asdasdfasd');
+        $process->read();
+    }
+
+    private static function setProcessName($name)
+    {
+        if (PHP_OS != 'Darwin' && function_exists('swoole_set_process_name')) {
+            swoole_set_process_name($name);
+        }
+    }
+
+    private static function log($msg)
+    {
+        if (is_array($msg) || is_object($msg)) {
+            $msg = json_encode($msg);
+        }
+        Logger::getInstance()->log($msg);
+    }
+
+    private static function initProcessConfig()
+    {
+        $json_file = EASYSWOOLE_ROOT . '/Esw/Command/config/process.json';
+        $json = file_get_contents($json_file);
+        $config = json_decode($json, true);
+
+        if (empty($config) || !is_array($config)) {
+            return false;
+        }
+        return self::$processConfig = $config;
     }
 
 }

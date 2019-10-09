@@ -11,7 +11,8 @@
     },
     "autoload": {
         "psr-4": {
-            "Esw\\": "Esw/"
+            "Esw\\": "Esw/",
+            "DHelper\\": "../common/"
         },
         "files": [
             "../common/autoloader.php"
