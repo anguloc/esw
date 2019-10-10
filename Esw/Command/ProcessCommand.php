@@ -63,6 +63,15 @@ class ProcessCommand implements CommandInterface
         /** cmd */
         $cmd = array_shift($args);
         if ($cmd) {
+
+
+            $sock = stream_socket_client("unix:///tmp/php.sock");
+            $data = json_encode(['code' => 1, 'msg' => 'Hello World!',]);
+//            fwrite($sock, $data);
+            fwrite($sock, pack('N', strlen($data)) . $data);
+            fclose($sock);
+
+            return '';
             $class = self::$processConfig['process'][$cmd] ?? null;
             if (!$class || !class_exists($class)) {
                 return '参数错误或者配置错误';
@@ -73,6 +82,7 @@ class ProcessCommand implements CommandInterface
                     return '获取队列错误';
                 }
                 $data = json_encode([
+                    'key' => $cmd,
                     'class' => $class,
                     'args' => $args,
                 ], JSON_UNESCAPED_UNICODE);
@@ -100,9 +110,50 @@ class ProcessCommand implements CommandInterface
 
     private function startMaster(array $args)
     {
+
+
+        return '';
+        Process::daemon();
+        self::setProcessName('Esw-Process-Pool');
+
+        $pool = new Process\Pool(1,SWOOLE_IPC_SOCKET,0,false);
+
+        $pool->on('message', function(Process\Pool $pool, $data){
+            self::log('message-'.$data);
+
+            $pool->shutdown();
+
+//            $a = new Process(function(Process $process){
+//                self::log('zxbhfasd');
+//                $process->name('Esw-Process-Worker');
+//            });
+//            $a::signal(SIGUSR1, function(){
+//                self::log('xzhs');
+//            });
+//            $a->start();
+        });
+        $pool->listen('unix:/tmp/php.sock');
+
+        $pool->on('workerStart',function(Process\Pool $pool, $worker_id){
+            /** @var Process $process */
+            $process = $pool->getProcess($worker_id);
+            $process->name('Esw-Process-Master');
+            $process::signal(SIGTERM, function($sig)use($process){
+                $process->exit(0);
+            });
+            self::log(json_encode($pool->workers));
+        });
+
+        $pool->start();
+
+        return '';
+
+
         /** @see __start */
         $process = new Process([$this, '__start'], false, 0, true);
-        $process->useQueue(self::$queueMsgKey, 2 | Process::IPC_NOWAIT);
+        $process->useQueue(self::$queueMsgKey);
+//        $process->useQueue(self::$queueMsgKey, 2 | Process::IPC_NOWAIT);
+
 
         $process->start();
     }
@@ -117,50 +168,83 @@ class ProcessCommand implements CommandInterface
             }
         });
 
+        Process::signal(SIGUSR1, function(){
+            self::log('sigusr1-'. json_encode(self::$pool, JSON_UNESCAPED_UNICODE));
+        });
+
         Process::signal(SIGTERM, function () use ($process) {
             go(function () use ($process) {
-                swoole_event_del($process->pipe);
-                $channel = new Channel(8);
-                go(function () use ($channel) {
-                    try {
-                        $channel->push($this->onShutDown());
-                    } catch (\Throwable $throwable) {
-                        $this->onException($throwable);
-                    }
-                });
-                $channel->pop(3);
-                swoole_event_exit();
+//                swoole_event_del($process->pipe);
+//                $channel = new Channel(8);
+//                go(function () use ($channel) {
+//                    try {
+//                        $channel->push($this->onShutDown());
+//                    } catch (\Throwable $throwable) {
+//                        $this->onException($throwable);
+//                    }
+//                });
+//                $channel->pop(3);
+//                swoole_event_exit();
                 Process::signal(SIGTERM, null);
                 $process->exit(0);
             });
         });
-        swoole_event_add($process->pipe, function () use ($process) {
-            try {
-                $this->onPipeReadable($process);
-            } catch (\Throwable $throwable) {
-                $this->onException($throwable);
-            }
+//        swoole_event_add($process->pipe, function () use ($process) {
+//            try {
+//                $this->onPipeReadable($process);
+//            } catch (\Throwable $throwable) {
+//                $this->onException($throwable);
+//            }
+//        });
+
+        Timer::tick(1000,function(){
+            self::log('1');
         });
 
+
+
+
         // 队列
-        go(function()use($process){
-            Timer::tick(3000, function () use ($process) {
-                if ($msg = $process->pop()) {
+//        go(function()use($process){
+//            Timer::tick(3000, function () use ($process) {
+//                if ($msg = $process->pop()) {
 //                    self::log('msg-'.$msg);
-                    new Process();
-                }
-            });
-        });
+//                    $msg = json_decode($msg, true);
+//                    $key = $msg['key'] ?? null;
+//                    $class = $msg['class'] ?? null;
+//                    $args = $msg['args'] ?? [];
+//                    if (!$key || !$class || !class_exists($class)) {
+//                        self::log('process-queue-msg-class-error' . json_encode($msg, JSON_UNESCAPED_UNICODE));
+//                        return false;
+//                    }
+//                    try {
+//                        $process = new Process(function (Process $process) use ($key, $class, $args) {
+//                            $this->startChildProcess($process, $key, $class, $args);
+//                        }, null, 0, true);
+//                        $pid = $process->start();
+//                        if (!$pid) {
+//                            self::log('process-queue-msg-start-error' . json_encode($msg, JSON_UNESCAPED_UNICODE));
+//                            return false;
+//                        }
+//                        self::$pool[$key] = [
+//                            'class' => $class,
+//                            'process' => $process,
+//                            'pid' => $pid,
+//                        ];
+//                        unset($process);
+//                    }catch(\Throwable $e){
+//                        self::log(catch_exception($e));
+//                    }
+//                }
+//            });
+//        });
 
 
     }
 
-    private function startChildProcess($msg)
+    private function startChildProcess(Process $process, $key, $class, $args)
     {
-        $class = self::$processConfig['process'][$cmd] ?? null;
-        if (!$class || !class_exists($class)) {
-            return '参数错误或者配置错误';
-        }
+        $process->name("Esw-Process-{$key}");
     }
 
 
