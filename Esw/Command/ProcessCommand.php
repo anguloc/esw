@@ -14,7 +14,6 @@ use EasySwoole\MysqliPool\Mysql as MysqlPool;
 use EasySwoole\RedisPool\Redis as RedisPool;
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Wire\AMQPTable;
-use PhpOffice\PhpWord\Style\Tab;
 use Swlib\Http\Exception\ClientException;
 use Swlib\Http\Exception\ConnectException;
 use Swlib\Http\Exception\HttpExceptionMask;
@@ -28,6 +27,10 @@ use Swoole\Table;
 use Swoole\Timer;
 use DHelper\RabbitMQ\RabbitMQTask;
 use Swoole\Process;
+use EasySwoole\Component\Process\AbstractProcess;
+use Symfony\Component\Console\Input\ArgvInput;
+use Symfony\Component\Console\Output\ConsoleOutput;
+use Symfony\Component\Console\Style\SymfonyStyle;
 
 /**
  * 进程控制
@@ -63,7 +66,34 @@ class ProcessCommand implements CommandInterface
         /** cmd */
         $cmd = array_shift($args);
         if ($cmd) {
+            $class = self::$processConfig['process'][$cmd] ?? null;
+            if (!$class || !class_exists($class)) {
+                return '参数错误或者配置错误';
+            }
 
+            $reflection_class = new \ReflectionClass($class);
+            if (!$reflection_class->isInstantiable()) {
+                return '代码错误，class无法实例化';
+            }
+            if ($reflection_class->isSubclassOf(AbstractProcess::class)) {
+                $config = [
+                    "Esw-Process-{$cmd}",
+                    $args,
+                ];
+                if ($reflection_class->hasMethod('getUserConfig')) {
+                    $config_method = $reflection_class->getMethod('getUserConfig');
+                    if ($config_method->isPublic() && $config_method->isStatic()) {
+                        $config = $config_method->invoke($reflection_class);
+                    }
+                }
+
+                $instance = $reflection_class->newInstanceArgs($config);
+                $instance->getProcess()->start();
+            } else {
+                $instance = $reflection_class->newInstanceArgs($args);
+            }
+
+            return '';
 
             $sock = stream_socket_client("unix:///tmp/php.sock");
             $data = json_encode(['code' => 1, 'msg' => 'Hello World!',]);
@@ -95,8 +125,9 @@ class ProcessCommand implements CommandInterface
             return 'success';
         }
 
+        return '缺少进程参数';
         /** Master */
-        $this->startMaster($args);
+//        $this->startMaster($args);
 
         return '';
     }
@@ -110,16 +141,17 @@ class ProcessCommand implements CommandInterface
 
     private function startMaster(array $args)
     {
-
+        Process::daemon();
+        self::setProcessName('Esw-Process-Master');
 
         return '';
         Process::daemon();
         self::setProcessName('Esw-Process-Pool');
 
-        $pool = new Process\Pool(1,SWOOLE_IPC_SOCKET,0,false);
+        $pool = new Process\Pool(1, SWOOLE_IPC_SOCKET, 0, false);
 
-        $pool->on('message', function(Process\Pool $pool, $data){
-            self::log('message-'.$data);
+        $pool->on('message', function (Process\Pool $pool, $data) {
+            self::log('message-' . $data);
 
             $pool->shutdown();
 
@@ -134,11 +166,11 @@ class ProcessCommand implements CommandInterface
         });
         $pool->listen('unix:/tmp/php.sock');
 
-        $pool->on('workerStart',function(Process\Pool $pool, $worker_id){
+        $pool->on('workerStart', function (Process\Pool $pool, $worker_id) {
             /** @var Process $process */
             $process = $pool->getProcess($worker_id);
             $process->name('Esw-Process-Master');
-            $process::signal(SIGTERM, function($sig)use($process){
+            $process::signal(SIGTERM, function ($sig) use ($process) {
                 $process->exit(0);
             });
             self::log(json_encode($pool->workers));
@@ -162,14 +194,14 @@ class ProcessCommand implements CommandInterface
     {
         self::setProcessName('Esw-Process-Master');
 
-        Process::signal(SIGCHLD, function($sig) {
-            while($ret =  Process::wait(false)) {
+        Process::signal(SIGCHLD, function ($sig) {
+            while ($ret = Process::wait(false)) {
 
             }
         });
 
-        Process::signal(SIGUSR1, function(){
-            self::log('sigusr1-'. json_encode(self::$pool, JSON_UNESCAPED_UNICODE));
+        Process::signal(SIGUSR1, function () {
+            self::log('sigusr1-' . json_encode(self::$pool, JSON_UNESCAPED_UNICODE));
         });
 
         Process::signal(SIGTERM, function () use ($process) {
@@ -197,11 +229,9 @@ class ProcessCommand implements CommandInterface
 //            }
 //        });
 
-        Timer::tick(1000,function(){
+        Timer::tick(1000, function () {
             self::log('1');
         });
-
-
 
 
         // 队列

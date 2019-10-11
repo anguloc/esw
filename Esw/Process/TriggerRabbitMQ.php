@@ -21,10 +21,10 @@ use EasySwoole\RedisPool\Redis as RedisPool;
 /**
  * 用于自定义command开进程
  *
- * Class SubRedis
+ * Class TriggerRabbitMQ
  * @package Esw\Process
  */
-class TriggerRabbitMQ extends AbstractProcess
+class TriggerRabbitMQ extends BaseProcess
 {
 
     public static $dead_exchanger_type = 'direct';
