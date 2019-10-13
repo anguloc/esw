@@ -37,7 +37,9 @@ class BaseProcess extends AbstractProcess
 
     public static function getUserConfig()
     {
-        return [1,2,3];
+        return [
+            "Esw-Process-Worker",
+        ];
     }
 
     public function run($args)

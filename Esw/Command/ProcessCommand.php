@@ -41,6 +41,10 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 class ProcessCommand implements CommandInterface
 {
     private $masterPid;
+    private $childPid;
+    private $childProcessInstance;
+    private $container;
+    private $exit = false;
 
     private static $pool = [];
 
@@ -58,91 +62,111 @@ class ProcessCommand implements CommandInterface
         return '玩玩进程以及队列等';
     }
 
+    /**
+     * @param array $args
+     * @return null|string
+     * @throws \ReflectionException
+     */
     public function exec(array $args): ?string
     {
-        /** init */
-        $this->init($args);
-
-        /** cmd */
-        $cmd = array_shift($args);
-        if ($cmd) {
-            $class = self::$processConfig['process'][$cmd] ?? null;
-            if (!$class || !class_exists($class)) {
-                return '参数错误或者配置错误';
-            }
-
-            $reflection_class = new \ReflectionClass($class);
-            if (!$reflection_class->isInstantiable()) {
-                return '代码错误，class无法实例化';
-            }
-            if ($reflection_class->isSubclassOf(AbstractProcess::class)) {
-                $config = [
-                    "Esw-Process-{$cmd}",
-                    $args,
-                ];
-                if ($reflection_class->hasMethod('getUserConfig')) {
-                    $config_method = $reflection_class->getMethod('getUserConfig');
-                    if ($config_method->isPublic() && $config_method->isStatic()) {
-                        $config = $config_method->invoke($reflection_class);
-                    }
-                }
-
-                $instance = $reflection_class->newInstanceArgs($config);
-                $instance->getProcess()->start();
+        try {
+            /** init */
+            $this->init($args);
+            /** startChildProcess */
+            $this->startChildProcess();
+            /** Master */
+            return $this->startMaster();
+        } catch (\Throwable $e) {
+            $msg = $e->getMessage();
+            if (!empty($msg)) {
+                exit("{$msg}\n");
             } else {
-                $instance = $reflection_class->newInstanceArgs($args);
+                exit("运行错误\n");
             }
-
-            return '';
-
-            $sock = stream_socket_client("unix:///tmp/php.sock");
-            $data = json_encode(['code' => 1, 'msg' => 'Hello World!',]);
-//            fwrite($sock, $data);
-            fwrite($sock, pack('N', strlen($data)) . $data);
-            fclose($sock);
-
-            return '';
-            $class = self::$processConfig['process'][$cmd] ?? null;
-            if (!$class || !class_exists($class)) {
-                return '参数错误或者配置错误';
-            }
-            try {
-                $queue = msg_get_queue(self::$queueMsgKey);
-                if (!$queue) {
-                    return '获取队列错误';
-                }
-                $data = json_encode([
-                    'key' => $cmd,
-                    'class' => $class,
-                    'args' => $args,
-                ], JSON_UNESCAPED_UNICODE);
-                if (!msg_send($queue, 1, $data, false, false, $error_code)) {
-                    return "send fail error_code is {$error_code}";
-                }
-            } catch (\Throwable $e) {
-                return '发送消息失败';
-            }
-            return 'success';
         }
-
-        return '缺少进程参数';
-        /** Master */
-//        $this->startMaster($args);
-
-        return '';
     }
 
+    /**
+     * @param array $args
+     * @throws \Exception
+     */
     private function init(array $args)
     {
         self::initProcessConfig();
 
+        /** cmd */
+        $this->container['cmd'] = array_shift($args);
+        if (empty($this->container['cmd'])) {
+            throw new \Exception('缺少进程参数');
+        }
+
+        $this->container['class'] = self::$processConfig['process'][$this->container['cmd']] ?? null;
+
+        if (!$this->container['class'] || !class_exists($this->container['class'])) {
+            throw new \Exception('参数错误或者配置错误');
+        }
+
+        $this->container['args'] = $args;
 
     }
 
-    private function startMaster(array $args)
+    private function startMaster()
     {
         Process::daemon();
-        self::setProcessName('Esw-Process-Master');
+        self::setProcessName("Esw-Process-Master-{$this->container['cmd']}");
+
+        $this->masterPid = getmypid();
+        $this->container['start_time'] = time();
+
+//        sys_get_temp_dir();
+        Process::signal(SIGUSR1, function ($sig) {
+            self::log('Master-USR1');
+        });
+        Process::signal(SIGUSR2, function ($sig) {
+            self::log('Master-USR2');
+        });
+
+
+        if ($this->childProcessInstance instanceof AbstractProcess) {
+            $this->childPid = $this->childProcessInstance->getProcess()->start();
+        }
+
+        Process::signal(SIGCHLD, function ($sig) {
+            while ($ret = Process::wait(false)) {
+//                $this->startChildProcess();
+//                if ($this->childProcessInstance instanceof AbstractProcess) {
+//                    $this->childPid = $this->childProcessInstance->getProcess()->start();
+//                }
+                Process::kill($this->masterPid, SIGTERM);
+            }
+        });
+
+        Process::signal(SIGTERM, function () {
+//            go(function () {
+//                swoole_event_del($process->pipe);
+//                $channel = new Channel(8);
+//                go(function () use ($channel) {
+//                    try {
+//                        $channel->push($this->onShutDown());
+//                    } catch (\Throwable $throwable) {
+//                        $this->onException($throwable);
+//                    }
+//                });
+//                $channel->pop(3);
+//                swoole_event_exit();
+//                Process::signal(SIGTERM, null);
+//                exit(0);
+//                $process->exit(0);
+//            });
+            $this->exit = true;
+        });
+
+        Timer::tick(1000, function ($timer_id) {
+            if($this->exit){
+                Timer::clear($timer_id);
+            }
+        });
+
 
         return '';
         Process::daemon();
@@ -188,6 +212,65 @@ class ProcessCommand implements CommandInterface
 
 
         $process->start();
+    }
+
+    /**
+     * @param $args
+     * @return string
+     * @throws \ReflectionException|\Exception
+     */
+    private function startChildProcess()
+    {
+        $reflection_class = new \ReflectionClass($this->container['class']);
+        if (!$reflection_class->isInstantiable()) {
+            throw new \Exception('代码错误，class无法实例化');
+        }
+        $config = [
+            "Esw-Process-Worker-{$this->container['cmd']}",
+            $this->container['args'] ?? [],
+        ];
+        if ($reflection_class->hasMethod('getUserConfig')) {
+            $config_method = $reflection_class->getMethod('getUserConfig');
+            if ($config_method->isPublic() && $config_method->isStatic()) {
+                $config = $config_method->invoke($reflection_class);
+            }
+        }
+
+        $this->childProcessInstance = $reflection_class->newInstanceArgs($config);
+    }
+
+    public function store()
+    {
+        return '';
+
+        $sock = stream_socket_client("unix:///tmp/php.sock");
+        $data = json_encode(['code' => 1, 'msg' => 'Hello World!',]);
+//            fwrite($sock, $data);
+        fwrite($sock, pack('N', strlen($data)) . $data);
+        fclose($sock);
+
+        return '';
+        $class = self::$processConfig['process'][$cmd] ?? null;
+        if (!$class || !class_exists($class)) {
+            return '参数错误或者配置错误';
+        }
+        try {
+            $queue = msg_get_queue(self::$queueMsgKey);
+            if (!$queue) {
+                return '获取队列错误';
+            }
+            $data = json_encode([
+                'key' => $cmd,
+                'class' => $class,
+                'args' => $args,
+            ], JSON_UNESCAPED_UNICODE);
+            if (!msg_send($queue, 1, $data, false, false, $error_code)) {
+                return "send fail error_code is {$error_code}";
+            }
+        } catch (\Throwable $e) {
+            return '发送消息失败';
+        }
+        return 'success';
     }
 
     public function __start(Process $process)
@@ -270,11 +353,6 @@ class ProcessCommand implements CommandInterface
 //        });
 
 
-    }
-
-    private function startChildProcess(Process $process, $key, $class, $args)
-    {
-        $process->name("Esw-Process-{$key}");
     }
 
 
