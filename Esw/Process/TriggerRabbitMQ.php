@@ -17,6 +17,7 @@ use Swoole\Table;
 use Swoole\Timer;
 use EasySwoole\EasySwoole\Logger;
 use EasySwoole\RedisPool\Redis as RedisPool;
+use EasySwoole\MysqliPool\Mysql as MysqlPool;
 use EasySwoole\Component\Process\Config as ProcessConfig;
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Wire\AMQPTable;
@@ -48,6 +49,19 @@ class TriggerRabbitMQ extends BaseProcess
 
     public static $message_mandatory = true;
 
+    public function runTask($msg)
+    {
+        if (!is_array($msg)) {
+            $msg = json_decode($msg, true);
+        }
+        if (empty($msg)) {
+            return $msg;
+        }
+
+
+
+    }
+
     /**
      * 启动定时器进行循环扫描
      *
@@ -66,12 +80,9 @@ class TriggerRabbitMQ extends BaseProcess
         $exchange_name = 'test_exchange_name';
         $timeout_queue_name = '';
         $queue_timeout = '';
-        $num = 1;
 
-        $callback = function () use ($num) {
-            Logger::getInstance()->log('rabbitmq-qqqq-' . $num . '-' . json_encode(func_get_args()));
-            return false;
-            return ['status' => 1, 'data' => 'zxhdfgsf'];
+        $callback = function ($msg) {
+            return $this->runTask($msg);
         };
 
         if (!empty($timeout_queue_name) && $queue_timeout < 0) {
@@ -142,11 +153,11 @@ class TriggerRabbitMQ extends BaseProcess
 //            $channel->wait();
 //        }
 
-        go(function()use($channel,$connection){
+        go(function () use ($channel, $connection) {
             $chan = new Channel(8);
 
 //        go(function()use($channel){
-            Timer::tick(1000, function()use($channel){
+            Timer::tick(1000, function () use ($channel) {
                 if (count($channel->callbacks)) {
                     $channel->wait();
                 }
@@ -161,7 +172,6 @@ class TriggerRabbitMQ extends BaseProcess
         });
 
 
-
         return '';
 //        go(function() {
 //            Timer::tick(1000, function () {
@@ -169,33 +179,33 @@ class TriggerRabbitMQ extends BaseProcess
 //            });
 //        });
 //        return '';
-        go(function(){
+        go(function () {
             $redis = RedisPool::defer(REDIS_POOL);
             $key = 1;
 
             $redis->set('exist', 1);
             $b = $redis->subscribe(['test']);
-            Logger::getInstance()->log(json_encode(['sub' => $b,'key' => $key]));
-            if($b){
-                while(true){
+            Logger::getInstance()->log(json_encode(['sub' => $b, 'key' => $key]));
+            if ($b) {
+                while (true) {
                     $msg = $redis->recv();
                     $msg = is_array($msg) ? json_encode($msg) : $msg;
-                    Logger::getInstance()->log($msg . '--key:'.$key);
+                    Logger::getInstance()->log($msg . '--key:' . $key);
                 }
             }
         });
-        go(function(){
+        go(function () {
             $redis = RedisPool::defer(REDIS_POOL);
             $key = 2;
 
             $redis->set('exist', 1);
             $b = $redis->subscribe(['test']);
-            Logger::getInstance()->log(json_encode(['sub' => $b,'key' => $key]));
-            if($b){
-                while(true){
+            Logger::getInstance()->log(json_encode(['sub' => $b, 'key' => $key]));
+            if ($b) {
+                while (true) {
                     $msg = $redis->recv();
                     $msg = is_array($msg) ? json_encode($msg) : $msg;
-                    Logger::getInstance()->log($msg . '--key:'.$key);
+                    Logger::getInstance()->log($msg . '--key:' . $key);
                 }
             }
         });
