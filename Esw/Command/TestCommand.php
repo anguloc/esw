@@ -92,7 +92,7 @@ class TestCommand implements CommandInterface
             $mail->setLanguage('zh_cn');
 
             //Recipients
-            $mail->setFrom('xy6220179@163.com', 'gk');
+            $mail->setFrom('xy62201793@163.com', 'gk');
             $mail->addAddress('279762072@qq.com', 'Joe User');     // Add a recipient
 //            $mail->addAddress('ellen@example.com');               // Name is optional
 //            $mail->addReplyTo('info@example.com', 'Information');
