@@ -1,5 +1,6 @@
 {
     "process": {
-        "RabbitMQ": "Esw\\Process\\TriggerRabbitMQ"
+        "RabbitMQ": "Esw\\Process\\TriggerRabbitMQ",
+        "test": "Esw\\Process\\TestProcess"
     }
 }

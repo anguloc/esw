@@ -28,7 +28,7 @@ use EasySwoole\RedisPool\Redis as RedisPool;
 class BaseProcess extends AbstractProcess
 {
 
-    private static $is_single_process = true; // 是否为单独进程 不跟随es启动
+    private static $isSingleProcess = true; // 是否为单独进程 不跟随es启动
 
     public function __start(Process $process)
     {

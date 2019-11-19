@@ -29,6 +29,7 @@ use Esw\Parser\WebSocketParser;
 use Esw\Process\HotReload;
 use Esw\Process\SubRedis;
 use Esw\Util\Logger as MyLogger;
+use EasySwoole\EasySwoole\Swoole\EventHelper;
 
 
 class EasySwooleEvent implements Event
